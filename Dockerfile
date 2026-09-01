@@ -2,7 +2,7 @@ FROM savonet/liquidsoap:v2.4.5
 
 USER root
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-venv ffmpeg curl ca-certificates gosu unzip gnupg \
+    && apt-get install -y --no-install-recommends python3 python3-venv ffmpeg curl ca-certificates gosu unzip gnupg libc6 libgcc-s1 libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
 # btch-downloader 6.3.6 requires Node.js >= 20.18.1.
@@ -23,7 +23,8 @@ RUN cd /app/node && npm install --omit=dev
 COPY node/btch-helper.mjs /app/node/btch-helper.mjs
 COPY requirements.txt /app/requirements.txt
 RUN python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt
+    && /opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt \
+    && /opt/venv/bin/python -c "import requests; from SpotipyFree import Spotify; Spotify(); print('SpotipyFree import OK')"
 
 COPY app /app/app
 COPY extras /app/extras
