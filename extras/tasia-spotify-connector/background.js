@@ -173,7 +173,11 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     const auth = headers.find(h => String(h.name || '').toLowerCase() === 'authorization');
     if (auth?.value) captureToken(auth.value, 'Spotify web-player API request');
   },
-  {urls:['https://api.spotify.com/*']},
+  {urls:[
+    'https://api.spotify.com/*',
+    'https://api-partner.spotify.com/*',
+    'https://spclient.wg.spotify.com/*'
+  ]},
   ['requestHeaders', 'extraHeaders']
 );
 
