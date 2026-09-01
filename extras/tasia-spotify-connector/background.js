@@ -57,7 +57,11 @@ async function sendSession(token, expiresAtMs, reason = 'captured') {
     try { payload = text ? JSON.parse(text) : {}; } catch { payload = {detail:text}; }
     if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
 
+    cachedToken = clean;
+    cachedExpiresAt = expiresAtMs || (Date.now() + 55 * 60 * 1000);
     await chrome.storage.local.set({
+      authToken: clean,
+      tokenExpiresAt: cachedExpiresAt,
       lastSync: Date.now(),
       lastError: '',
       lastReason: reason,
@@ -79,28 +83,26 @@ async function sendSession(token, expiresAtMs, reason = 'captured') {
   }
 }
 
-async function captureToken(raw, reason = 'Spotify API request') {
+async function captureToken(raw, reason = 'Spotify token source') {
   const token = String(raw || '').replace(/^Bearer\s+/i, '').trim();
-  if (!token || token.length < 20) return;
+  if (!token || token.length < 20) return {ok:false, error:'Captured token is empty'};
 
   let expiry = tokenExpiryMs(token);
   if (!expiry || expiry <= Date.now() + 30_000) expiry = Date.now() + 55 * 60 * 1000;
 
-  const same = token === cachedToken;
-  cachedToken = token;
-  cachedExpiresAt = expiry;
-  await chrome.storage.local.set({authToken:token, tokenExpiresAt:expiry, lastCaptured:Date.now()});
-
-  const data = await getConfig();
   const now = Date.now();
+  const data = await getConfig();
+  const same = token === cachedToken || token === String(data.authToken || '');
   const lastSync = Number(data.lastSync || 0);
   const shouldSync = !same || now - lastSync > 5 * 60 * 1000;
   const retryAllowed = token !== lastAttemptToken || now - lastAttemptAt > 60_000;
-  if (shouldSync && retryAllowed) {
-    lastAttemptToken = token;
-    lastAttemptAt = now;
-    await sendSession(token, expiry, reason);
-  }
+  if (!shouldSync || !retryAllowed) return {ok:true, skipped:true};
+
+  lastAttemptToken = token;
+  lastAttemptAt = now;
+  // Only persist a newly observed token after the Tasia backend validates it
+  // against Spotify /v1/search. Internal web-player bearer values can exist too.
+  return sendSession(token, expiry, reason);
 }
 
 async function backendStatus() {
@@ -128,23 +130,26 @@ async function backendStatus() {
   }
 }
 
-async function wakeSpotify(reason = 'auto refresh') {
+async function wakeTokenSource(reason = 'auto refresh') {
   try {
-    const tabs = await chrome.tabs.query({url:'https://open.spotify.com/*'});
-    const reusable = tabs.find(t => !t.active) || null;
+    // spotDL's 2026 workaround gets a normal one-hour Web API token from the
+    // public Spotify for Developers page. Prefer that exact source because the
+    // backend can validate it directly against /v1/search.
+    const devTabs = await chrome.tabs.query({url:'https://developer.spotify.com/*'});
+    const reusable = devTabs.find(t => !t.active) || null;
     if (reusable?.id !== undefined) {
       helperTabId = reusable.id;
       helperTabOwned = false;
       await chrome.tabs.reload(reusable.id);
-      await chrome.storage.local.set({lastReason:`${reason}: refreshed existing Spotify tab`});
-      return {ok:true, tabId:reusable.id, reused:true};
+      await chrome.storage.local.set({lastReason:`${reason}: refreshed Spotify developer token page`});
+      return {ok:true, tabId:reusable.id, reused:true, source:'developer'};
     }
 
-    const tab = await chrome.tabs.create({url:'https://open.spotify.com/', active:false});
+    const tab = await chrome.tabs.create({url:'https://developer.spotify.com/', active:false});
     helperTabId = tab.id ?? null;
     helperTabOwned = helperTabId !== null;
-    await chrome.storage.local.set({lastReason:`${reason}: opened helper Spotify tab`});
-    return {ok:true, tabId:helperTabId, reused:false};
+    await chrome.storage.local.set({lastReason:`${reason}: opened Spotify developer token page`});
+    return {ok:true, tabId:helperTabId, reused:false, source:'developer'};
   } catch (error) {
     const message = String(error?.message || error);
     await chrome.storage.local.set({lastError:message, lastReason:reason});
@@ -169,7 +174,7 @@ async function refreshIfNeeded(force = false) {
     if (synced.ok) return synced;
   }
 
-  return wakeSpotify(force ? 'manual refresh' : 'token refresh needed');
+  return wakeTokenSource(force ? 'manual refresh' : 'token refresh needed');
 }
 
 chrome.storage.local.get(['authToken','tokenExpiresAt']).then(data => {
@@ -177,6 +182,9 @@ chrome.storage.local.get(['authToken','tokenExpiresAt']).then(data => {
   cachedExpiresAt = Number(data.tokenExpiresAt || 0);
 });
 
+// Fallback: if the current Spotify web player happens to use a bearer that is
+// also accepted by the public Web API, capture it. The backend validates before
+// it is persisted, so private/internal tokens cannot replace a good token.
 chrome.webRequest.onBeforeSendHeaders.addListener(
   details => {
     const headers = details.requestHeaders || [];
@@ -199,6 +207,10 @@ chrome.runtime.onStartup.addListener(() => refreshIfNeeded(false));
 chrome.runtime.onInstalled.addListener(() => refreshIfNeeded(false));
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.action === 'developerToken') {
+    captureToken(message.token, 'spotDL-compatible developer.spotify.com token').then(sendResponse);
+    return true;
+  }
   if (message?.action === 'syncNow') {
     getConfig().then(async data => {
       const token = String(data.authToken || cachedToken || '').trim();
