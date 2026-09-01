@@ -2,6 +2,8 @@ let cachedToken = null;
 let cachedExpiresAt = 0;
 let helperTabId = null;
 let helperTabOwned = false;
+let lastAttemptToken = null;
+let lastAttemptAt = 0;
 
 function normalizeBaseUrl(value) {
   return String(value || '').trim().replace(/\/+$/, '');
@@ -90,8 +92,13 @@ async function captureToken(raw, reason = 'Spotify API request') {
   await chrome.storage.local.set({authToken:token, tokenExpiresAt:expiry, lastCaptured:Date.now()});
 
   const data = await getConfig();
+  const now = Date.now();
   const lastSync = Number(data.lastSync || 0);
-  if (!same || Date.now() - lastSync > 5 * 60 * 1000) {
+  const shouldSync = !same || now - lastSync > 5 * 60 * 1000;
+  const retryAllowed = token !== lastAttemptToken || now - lastAttemptAt > 60_000;
+  if (shouldSync && retryAllowed) {
+    lastAttemptToken = token;
+    lastAttemptAt = now;
     await sendSession(token, expiry, reason);
   }
 }
@@ -147,6 +154,9 @@ async function wakeSpotify(reason = 'auto refresh') {
 
 async function refreshIfNeeded(force = false) {
   const data = await getConfig();
+  const tasiaUrl = normalizeBaseUrl(data.tasiaUrl);
+  const connectorKey = String(data.connectorKey || '').trim();
+  if (!tasiaUrl || !connectorKey) return {ok:true, configured:false};
   if (data.autoRefresh === false && !force) return {ok:true, skipped:true};
 
   const status = await backendStatus();
