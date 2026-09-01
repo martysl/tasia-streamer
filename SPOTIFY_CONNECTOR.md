@@ -7,10 +7,13 @@ This beta30 candidate replaces only that search-token path. Existing Spotify tra
 ## Design
 
 - Spotify track URL → BTCH, no Spotify search token required.
-- Spotify text search → short-lived Bearer token captured from the user's own logged-in Spotify Web Player.
+- Spotify text search → the same short-lived Web API token source documented by spotDL's 2026 workaround: the `const token = '...'` example on `developer.spotify.com` while logged into Spotify.
+- The Chrome/Chromium connector extracts that token automatically and sends it only to the paired Tasia account.
+- Tasia validates every newly captured token against Spotify `/v1/search` before persisting it.
 - Spotify search results → private per-user cache for 7 days.
 - The token itself is never extended to 7 days. If its expiry cannot be decoded, Tasia conservatively treats it as valid for 55 minutes.
-- The Chrome/Chromium connector checks token status periodically and refreshes before expiry by reloading an inactive Spotify tab or opening a temporary inactive helper tab.
+- The connector checks token status every 10 minutes. Tasia marks it refresh-needed with 12 minutes remaining, so normal expiration is refreshed proactively.
+- As a fallback, Web Player Bearer values may be observed, but an internal/private token cannot replace a working token unless it passes Tasia's `/v1/search` validation.
 - `All Sources` already isolates provider failures, so Spotify token problems do not stop Universal/Audius/other configured sources.
 
 ## Server endpoints
@@ -27,12 +30,12 @@ The beta30 candidate reuses Tasia's existing per-user connector key (currently g
 
 ## Browser setup
 
-1. Keep your own account logged into `https://open.spotify.com/`.
-2. Download `/api/spotify/connector/download` from your Tasia Streamer.
-3. Extract the ZIP.
-4. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `tasia-spotify-connector/`.
-5. Enter your Tasia Streamer URL and existing Tasia connector key.
-6. Enable **Auto-refresh before the token expires**.
+1. Build/run the beta30 candidate Streamer.
+2. Download `/api/spotify/connector/download` from your Tasia Streamer and extract it.
+3. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `tasia-spotify-connector/`.
+4. Enter your Tasia Streamer URL and existing Tasia connector key.
+5. Enable **Auto-refresh before the token expires**.
+6. Press **Open Spotify token page** and log into Spotify there if necessary.
 7. Press **Refresh token now** once.
 8. Test Spotify text search in Online / Universal.
 
@@ -50,8 +53,8 @@ Search cache:
 /data/users/<user-id>/spotify-search-cache.json
 ```
 
-The connector does not read the Spotify password or export the browser cookie jar. It observes the short-lived Bearer token used by the logged-in Spotify web player and sends it only to the Tasia Streamer origin explicitly approved in the extension.
+The connector does not receive the Spotify password and does not export the browser cookie jar. It extracts the short-lived token exposed in Spotify's developer-page example and sends it only to the Tasia Streamer origin explicitly approved in the extension.
 
 ## Important
 
-This is a browser-session compatibility bridge, not an official Spotify developer-app authentication flow. Spotify can change its web player at any time, so the connector should be verified in a real Chrome/Chromium session before merging beta30.
+This is a compatibility bridge around Spotify's current public developer-page token, not an official developer-app OAuth integration. Spotify can change that page or token flow at any time, so the connector should be verified in a real Chrome/Chromium session before merging beta30.
