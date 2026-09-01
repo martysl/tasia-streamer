@@ -24,7 +24,8 @@ COPY node/btch-helper.mjs /app/node/btch-helper.mjs
 COPY requirements.txt /app/requirements.txt
 RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt \
-    && /opt/venv/bin/python -c "import requests; from SpotipyFree import Spotify; Spotify(); print('SpotipyFree import OK')"
+    && /opt/venv/bin/pip check \
+    && /opt/venv/bin/python -c "import importlib.metadata as m; print('spotipyFree', m.version('spotipyFree')); print('spotapi', m.version('spotapi')); import requests; from SpotipyFree import Spotify; Spotify(); print('SpotipyFree import OK')"
 
 COPY app /app/app
 COPY extras /app/extras
