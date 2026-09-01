@@ -1,0 +1,10 @@
+.env
+data/*
+!data/cache/
+!data/cache/.gitkeep
+!data/uploads/
+!data/uploads/.gitkeep
+music/*
+!music/.gitkeep
+__pycache__/
+*.pyc

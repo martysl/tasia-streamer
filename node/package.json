@@ -1,0 +1,8 @@
+{
+  "name": "tasia-btch-bridge",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "btch-downloader": "6.3.6"
+  }
+}

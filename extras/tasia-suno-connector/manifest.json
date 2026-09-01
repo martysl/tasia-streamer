@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Tasia Suno Connector",
+  "version": "1.0.0",
+  "description": "Connect your own logged-in Suno session to your own Tasia Streamer instance.",
+  "permissions": ["storage", "webRequest"],
+  "host_permissions": [
+    "https://suno.com/*",
+    "https://*.suno.com/*",
+    "https://suno.ai/*",
+    "https://*.suno.ai/*"
+  ],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html", "default_title": "Tasia Suno Connector"}
+}

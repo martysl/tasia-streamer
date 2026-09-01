@@ -1,0 +1,60 @@
+settings.log.stdout := true
+settings.log.level := 3
+settings.server.telnet := true
+settings.server.telnet.bind_addr := "127.0.0.1"
+settings.server.telnet.port := __CONTROL_PORT__
+
+# Python owns this user's persistent queue and resolves local/cached/provider audio URIs.
+def next_request() =
+  result = list.hd(
+    default="",
+    process.read.lines("curl -fsS --max-time 25 'http://127.0.0.1:8080/internal/next/__USER_ID__?key=__INTERNAL_KEY__'")
+  )
+  if result == "" then [] else [request.create(result)] end
+end
+
+scheduler = request.dynamic.list(
+  id="scheduler",
+  prefetch=1,
+  retry_delay=2.,
+  timeout=30.,
+  next_request
+)
+add_skip_command(scheduler)
+
+# DJ play/pause. Pause keeps SHOUTcast connected and feeds silence.
+tasia_playout = interactive.bool("tasia_playout", true)
+radio = switch(track_sensitive=false, [
+  ({tasia_playout()}, scheduler),
+  ({true}, blank())
+])
+
+# Track metadata on the FINAL source that feeds the output, not merely on a
+# prefetched request. This keeps "On Air" tied to what the output is pulling.
+current_meta = ref([])
+radio.on_track(
+  synchronous=true,
+  fun (m) -> current_meta := m
+)
+
+def get_internal_meta(_, response) =
+  response.json(current_meta())
+end
+harbor.http.register(port=__META_PORT__, method="GET", "/internal-meta", get_internal_meta)
+
+# Do not connect until the web UI presses Connect.
+output.shoutcast(
+  %mp3(bitrate=__BITRATE__, samplerate=__SAMPLE_RATE__, stereo=true),
+  id="shoutcast",
+  start=false,
+  host="__HOST__",
+  port=__PORT__,
+  password="__PASSWORD__",
+  icy_id=__SID__,
+  name="__NAME__",
+  genre="__GENRE__",
+  url="__URL__",
+  public=__PUBLIC__,
+  send_icy_metadata=true,
+  radio
+)

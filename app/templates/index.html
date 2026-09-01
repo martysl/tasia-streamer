@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tasia Streamer</title>
+  <link rel="stylesheet" href="/static/style.css?v=2.0.0-beta29">
+</head>
+<body>
+  <section id="authScreen" class="auth-screen hidden">
+    <div class="auth-card">
+      <a class="auth-home" href="/">← Home</a>
+      <div class="brandmark">T</div>
+      <div class="eyebrow">TASIA STREAMER 2</div>
+      <h1 id="authTitle">Login</h1>
+      <p id="authHint">Your own library, queue, playlist and radio settings.</p>
+      <input id="authDisplay" placeholder="Display name" class="hidden">
+      <input id="authUser" placeholder="Username" autocomplete="username">
+      <input id="authPass" type="password" placeholder="Password" autocomplete="current-password">
+      <button id="authSubmit">Login</button>
+      <div id="authMsg" class="msg"></div>
+    </div>
+  </section>
+
+  <main id="appShell" class="app-shell hidden">
+    <header class="topbar">
+      <a class="brand" href="/" title="Tasia Streamer home"><span class="brandmark small">T</span><div><strong>Tasia Streamer</strong><small>Radio workstation</small></div></a>
+      <div class="onair-strip">
+        <span id="airDot" class="dot unknown"></span>
+        <div><small>ON AIR</small><strong id="nowCompact">Nothing on air</strong></div>
+        <div class="mini-progress"><div id="miniProgress"></div></div>
+        <span id="miniTime">0:00 / 0:00</span>
+      </div>
+      <div class="userbox"><span id="whoami">—</span><button id="aiBtn" class="ghost tiny">✨ DJ AI</button><button id="settingsBtn" class="ghost tiny">Settings</button><button id="logoutBtn" class="ghost tiny">Logout</button></div>
+    </header>
+
+    <section class="transportbar">
+      <div class="connection-block">
+        <span class="label">SHOUTCAST</span>
+        <span id="shoutcastDot" class="dot unknown"></span><strong id="shoutcastStatus">Stopped</strong>
+      </div>
+      <div class="transport">
+        <button id="connect">Connect</button>
+        <button id="disconnect" class="ghost">Disconnect</button>
+        <button id="play">▶ Play</button>
+        <button id="pause" class="ghost">Ⅱ Pause</button>
+        <button id="stop" class="ghost">■ Stop</button>
+        <button id="skip" class="danger">⏭ Skip</button>
+      </div>
+      <div class="set-clock">
+        <div><small>QUEUE SET</small><strong id="queueSetTime">0:00</strong></div>
+        <div><small>ENDS</small><strong id="queueEnds">—</strong></div>
+        <div><small>PLAYLIST</small><strong id="playlistSetTime">0:00</strong></div>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <section class="pane library-pane">
+        <div class="pane-head"><div><span class="label">LIBRARY</span><strong>Song chooser</strong><small id="musicRoot" class="folder-root">Your private music folder</small></div><div class="head-actions"><button id="scan" class="ghost tiny">Scan</button><button id="uploadOpen" class="ghost tiny">Upload</button></div></div>
+        <div class="tabs"><button class="tab active" data-tab="library">Local folders</button><button class="tab" data-tab="favorites">★ Saved</button><button class="tab" data-tab="sources">Remote / Jellyfin</button><button class="tab" data-tab="catalogs">Online / Universal</button></div>
+        <div id="localTab" class="tabbody">
+          <div class="library-search"><span>⌕</span><input id="librarySearch" placeholder="Search all my music — title, artist or folder"><button id="clearSearch" class="ghost tiny" title="Clear search">✕</button></div>
+          <div class="breadcrumb local-breadcrumb"><button id="libraryUp" class="ghost tiny">↑ Up</button><button id="libraryRoot" class="ghost tiny">⌂</button><span id="libraryPath">/</span></div>
+          <div id="library" class="tracklist"></div>
+          <div class="bottom-actions"><button id="queueLibraryAll" class="tiny">+ Queue folder</button><button id="playlistLibraryAll" class="ghost tiny">+ Folder → Playlist</button><span id="librarySummary" class="mini-summary">—</span></div>
+        </div>
+        <div id="favoritesTab" class="tabbody hidden">
+          <div class="library-search"><span>★</span><input id="favoritesSearch" placeholder="Search my saved tracks — title, artist or source"><button id="clearFavoritesSearch" class="ghost tiny" title="Clear search">✕</button></div>
+          <div id="favorites" class="tracklist"></div>
+          <div class="bottom-actions"><span id="favoritesSummary" class="mini-summary">0 saved tracks</span></div>
+          <div class="hint">Saved tracks remember where they came from. Universal, Suno and remote tracks are resolved/cached only when you press Q or P.</div>
+        </div>
+        <div id="sourcesTab" class="tabbody hidden">
+          <div class="source-row"><select id="sourceSelect"></select><button id="sourceAddOpen" class="ghost tiny">+ Source</button></div>
+          <div class="library-search"><span>⌕</span><input id="sourceSearch" placeholder="Search this remote music source"><button id="clearSourceSearch" class="ghost tiny" title="Clear search">✕</button></div>
+          <div class="breadcrumb"><button id="sourceUp" class="ghost tiny">↑ Up</button><span id="sourcePath">/</span></div>
+          <div id="sourceBrowser" class="tracklist"></div>
+        </div>
+        <div id="catalogsTab" class="tabbody hidden">
+          <div class="chooserbar catalog-searchbar"><select id="catalogProvider"><option value="all">All Sources</option><option value="btch-spotify">Spotify</option><option value="universal">Universal Search</option><option value="soundcloud">SoundCloud Search</option><option value="btch-soundcloud">SoundCloud URL</option><option value="btch-gdrive">Google Drive URL</option><option value="audius">Audius</option><option value="jamendo">Jamendo</option><option value="stremio">Stremio Addon</option></select><input id="catalogSearch" placeholder="Song, artist or supported URL…"></div>
+          <div class="catalog-toolbar"><button id="catalogSearchBtn" class="tiny">Search</button><button id="catalogTestBtn" class="ghost tiny">Test source</button><span id="catalogStatus" class="mini-summary">Choose a provider and search.</span></div>
+          <div id="catalogResults" class="tracklist"></div>
+          <div class="hint catalog-hint">Universal Search supports text search. All Sources searches Spotify, Universal, Audius and any configured SoundCloud/Jamendo/Stremio catalogs. Spotify also supports text search; SoundCloud and Google Drive BTCH resolvers accept direct URLs. Other catalogs resolve when due.</div>
+        </div>
+      </section>
+
+      <section class="pane center-pane">
+        <div class="now-card">
+          <span class="label">ACTUALLY ON AIR</span>
+          <h2 id="nowTitle">Nothing on air</h2><p id="nowArtist">—</p><div id="nowSource" class="now-source hidden"></div>
+          <div class="progress-track"><div id="progressFill"></div></div>
+          <div class="progress-row"><span id="progressElapsed">0:00</span><span id="progressRemaining">-0:00</span><span id="progressDuration">0:00</span></div><div id="playbackError" class="msg bad hidden"></div>
+        </div>
+        <div class="pane-head"><div><span class="label">QUEUE</span><strong>Next on air</strong></div><div class="head-actions"><button id="queuePlaylist" class="tiny">Queue Playlist</button><button id="clearQueue" class="ghost tiny">Clear</button></div></div>
+        <div class="hint">Drag songs or edit their position number. The preloaded “ON DECK” row is locked.</div>
+        <div id="queue" class="tracklist queue-list"></div>
+      </section>
+
+      <section class="pane playlist-pane">
+        <div class="pane-head"><div><span class="label">PLAYLIST</span><strong>Set builder</strong></div><div class="head-actions"><button id="importTxtOpen" class="ghost tiny">Import TXT</button><button id="clearPlaylist" class="ghost tiny">Clear</button></div></div>
+        <div class="hint">Drag songs or type a position number to build the set. Times show where each song lands if the set starts now.</div>
+        <div id="playlist" class="tracklist"></div>
+        <div class="suno-box">
+          <span class="label">SUNO / DIRECT AUDIO</span>
+          <input id="sunoUrl" placeholder="Suno share link, /song/UUID, bare UUID, or direct audio URL">
+          <div class="two-input"><input id="sunoArtist" placeholder="Artist (optional)"><input id="sunoTitle" placeholder="Title (optional)"></div>
+          <div class="button-row"><button id="sunoQueue">Cache + Queue</button><button id="sunoPlaylist" class="ghost">Cache + Playlist</button><button id="sunoFavorite" class="ghost">★ Save</button></div>
+          <div id="sunoMsg" class="msg"></div>
+        </div>
+      </section>
+    </section>
+
+    <div id="localPreview" class="local-preview global-preview hidden">
+      <div class="local-preview-head"><div><span class="label">LOCAL TEST / PREVIEW</span><strong id="localPreviewTitle">—</strong><small id="localPreviewArtist">—</small></div><button id="localPreviewStop" class="ghost tiny" title="Stop local preview">■ Stop</button></div>
+      <audio id="localPreviewAudio" controls preload="metadata"></audio>
+      <div id="localPreviewMsg" class="msg"></div>
+    </div>
+
+    <input id="uploadInput" class="hidden" type="file" accept="audio/*">
+  </main>
+
+  <dialog id="txtImportDialog">
+    <form method="dialog" class="dialog-card txt-import-card">
+      <div class="dialog-head"><div><span class="label">PLAYLIST FILE</span><h3>Import TXT set</h3></div><button value="cancel" class="ghost">✕</button></div>
+      <p class="hint">One song or link per line. Use <code>Artist - Title</code>, a song title, or mix Spotify / SoundCloud / Google Drive / YouTube / Suno links in the same list. Tasia can search all sources automatically or only the service you choose.</p>
+      <label>TXT file (optional)<input id="txtImportFile" type="file" accept=".txt,text/plain"></label>
+      <label>Or paste a song list<textarea id="txtImportText" rows="7" placeholder="Lady Gaga - Poker Face
+Daft Punk - One More Time
+https://open.spotify.com/track/...
+https://soundcloud.com/..."></textarea></label>
+      <div class="two-input">
+        <label>Import to<select id="txtImportTarget"><option value="playlist">Playlist</option><option value="queue">Queue</option><option value="favorites">★ Saved / Favourites</option></select></label>
+        <label>Find songs in<select id="txtImportSource"><option value="auto">Auto / All Sources + Local</option><option value="all">All online sources</option><option value="btch-spotify">Spotify</option><option value="universal">Universal Search</option><option value="soundcloud">SoundCloud Search</option><option value="audius">Audius</option><option value="jamendo">Jamendo</option><option value="stremio">Stremio Addon</option><option value="btch-soundcloud">SoundCloud links only</option><option value="btch-gdrive">Google Drive links only</option></select></label>
+      </div>
+      <div class="two-input">
+        <label class="check txt-check"><input id="txtSkipDuplicates" type="checkbox" checked> Skip duplicates</label>
+        <label class="check txt-check"><input id="txtContinueErrors" type="checkbox" checked> Continue if one song cannot be resolved</label>
+      </div>
+      <div class="button-row"><button id="txtImportStart" type="button">Import TXT</button><button value="cancel" class="ghost">Close</button></div>
+      <div id="txtImportMsg" class="msg"></div>
+      <div id="txtImportReport" class="import-report hidden"></div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="dialog-card wide">
+      <div class="dialog-head"><div><span class="label">ACCOUNT STREAM PROFILE</span><h3>Settings</h3></div><button value="cancel" class="ghost">✕</button></div>
+      <div class="settings-grid">
+        <label>Host<input id="setHost"></label><label>Port<input id="setPort" type="number"></label>
+        <label>Source password<input id="setPassword" type="password" placeholder="Leave blank to keep current"></label><label>SID<input id="setSid" type="number"></label>
+        <label>Stream name<input id="setName"></label><label>Genre<input id="setGenre"></label>
+        <label>Stream URL<input id="setUrl"></label><label>Bitrate kbps<input id="setBitrate" type="number"></label>
+        <label>Sample rate<input id="setSampleRate" type="number"></label>
+        <label class="check"><input id="setPublic" type="checkbox"> Public listing</label>
+        <label class="check"><input id="setAutoplay" type="checkbox"> Autoplay library if queue empty</label>
+        <label class="check"><input id="setAutoStart" type="checkbox"> Auto-connect after app restart</label>
+      </div>
+      <div id="settingsMsg" class="msg"></div>
+      <div class="dialog-actions"><button id="saveSettings" type="button">Save stream profile</button></div>
+
+      <hr><span class="label">STREAMING CATALOGS</span>
+      <p class="settings-note">Per-user online music/catalog sources. Secrets stay server-side and are never sent back to browser JavaScript.</p>
+      <div class="catalog-settings-block">
+        <strong>Universal Search</strong><small>Search uses yt-dlp only to find YouTube results. Playback/download goes through your MP3 converter API, is validated with FFmpeg, then cached privately before Q/P.</small>
+        <div class="settings-grid"><label class="full-span">MP3 converter API<input id="universalConverterUrl" placeholder="https://yapi.is-on.click/api/convert"></label></div>
+        <div class="button-row"><button id="saveUniversal" type="button" class="ghost">Save converter</button><button id="testUniversal" type="button" class="ghost">Test search</button><label class="file-button ghost">Upload YouTube search cookies.txt<input id="universalCookies" type="file" accept=".txt,text/plain" hidden></label><button id="clearUniversalCookies" type="button" class="ghost">Remove cookies</button></div>
+        <div id="universalCatalogMsg" class="msg"></div>
+      </div>
+      <div class="catalog-settings-block">
+        <strong>Suno connection</strong><small>Recommended: install Tasia Suno Connector, pair it once, and stay logged into Suno in your normal browser. The connector sends only your own Clerk <code>__client</code> session value + device id to your own Streamer. Docker exchanges that refreshable session for fresh JWTs automatically, then resolves tracks through Suno feed API and downloads the returned <code>audio_url</code>. No guessed CDN URLs.</small>
+        <div class="settings-grid">
+          <label class="full-span">Connector key<input id="sunoConnectorKey" readonly placeholder="Click Generate connector key"></label>
+          <label class="full-span">Manual __client cookie (headless fallback)<textarea id="sunoClientCookie" rows="3" placeholder="Paste only __client value, or a Cookie header containing __client=..."></textarea></label>
+        </div>
+        <div class="button-row"><a class="file-button ghost" href="/api/suno/connector/download">Download Tasia Suno Connector</a><button id="generateSunoConnector" type="button" class="ghost">Generate connector key</button><button id="copySunoConnector" type="button" class="ghost">Copy connector setup</button><button id="saveSunoClientCookie" type="button" class="ghost">Save manual session</button><button id="refreshSunoSession" type="button" class="ghost">Refresh now</button><button id="clearSunoSession" type="button" class="ghost">Disconnect Suno</button><button id="rotateSunoConnector" type="button" class="ghost">Rotate connector key</button></div>
+        <details class="legacy-suno"><summary>Legacy signed-cookie fallback</summary><small>Normally unnecessary in beta27. Keep this only for unusual CloudFront signed-cookie delivery.</small><div class="settings-grid"><label class="full-span">Cookie header<textarea id="sunoCookieHeader" rows="2" placeholder="Cookie: name=value; ..."></textarea></label></div><div class="button-row"><button id="saveSunoCookieHeader" type="button" class="ghost">Save cookie</button><label class="file-button ghost">Upload cookies.txt<input id="sunoCookies" type="file" accept=".txt,text/plain" hidden></label><button id="clearSunoCookies" type="button" class="ghost">Remove cookies</button></div></details>
+        <div id="sunoAuthMsg" class="msg"></div>
+      </div>
+      <div class="catalog-settings-block">
+        <strong>SoundCloud</strong><small>Legacy optional provider. Requires a registered SoundCloud API app; Universal Search does not.</small>
+        <div class="settings-grid"><label>Client ID<input id="scClientId"></label><label>Client Secret<input id="scClientSecret" type="password" placeholder="Leave blank to keep saved secret"></label><label class="check"><input id="scClearSecret" type="checkbox"> Remove saved Client Secret</label></div>
+        <div class="button-row"><button id="saveSoundCloud" type="button" class="ghost">Save SoundCloud</button><button id="testSoundCloud" type="button" class="ghost">Test</button></div><div id="scCatalogMsg" class="msg"></div>
+      </div>
+      <div class="catalog-settings-block">
+        <strong>Audius</strong><small>Public catalog search/streaming. Optional Bearer Token for authenticated API setups.</small>
+        <div class="settings-grid"><label class="full-span">Bearer Token (optional)<input id="audiusBearer" type="password" placeholder="Leave blank to keep saved token"></label><label class="check"><input id="audiusClearBearer" type="checkbox"> Remove saved Bearer Token</label></div>
+        <div class="button-row"><button id="saveAudius" type="button" class="ghost">Save Audius</button><button id="testAudius" type="button" class="ghost">Test</button></div><div id="audiusCatalogMsg" class="msg"></div>
+      </div>
+      <div class="catalog-settings-block">
+        <strong>Jamendo</strong><small>Requires a Jamendo API Client ID. Search results show the track license when available.</small>
+        <div class="settings-grid"><label class="full-span">Client ID<input id="jamendoClientId"></label></div>
+        <div class="button-row"><button id="saveJamendo" type="button" class="ghost">Save Jamendo</button><button id="testJamendo" type="button" class="ghost">Test</button></div><div id="jamendoCatalogMsg" class="msg"></div>
+      </div>
+      <div class="catalog-settings-block">
+        <strong>Stremio Addon</strong><small>Install a manifest URL. Tasia accepts only direct HTTP(S) stream URLs suitable for the radio engine.</small>
+        <div class="settings-grid"><label class="full-span">Addon manifest URL<input id="stremioManifestUrl" placeholder="https://addon.example/manifest.json"></label></div>
+        <div class="button-row"><button id="saveStremio" type="button" class="ghost">Save Stremio Addon</button><button id="testStremio" type="button" class="ghost">Test</button></div><div id="stremioCatalogMsg" class="msg"></div>
+      </div>
+
+      <hr><span class="label">DJ AI — OPTIONAL OPENAI-COMPATIBLE ENDPOINT</span>
+      <p class="settings-note">Used only when you press DJ AI. The API key stays on the server and is never returned to the browser.</p>
+      <div class="settings-grid">
+        <label>Base URL<input id="aiBaseUrl" placeholder="http://server:1234/v1 or https://provider.example/v1"></label>
+        <label>Model<input id="aiModel" placeholder="model-name"></label>
+        <label class="full-span">API key<input id="aiApiKey" type="password" placeholder="Leave blank to keep saved key"></label>
+        <label class="full-span">DJ system prompt<textarea id="aiSystemPrompt" rows="3" placeholder="Optional — defaults to concise party/radio DJ advice"></textarea></label>
+        <label class="check"><input id="aiClearKey" type="checkbox"> Remove saved API key</label>
+      </div>
+      <div class="button-row"><button id="saveAISettings" type="button" class="ghost">Save AI settings</button><button id="testAI" type="button" class="ghost">Test AI</button></div><div id="aiSettingsMsg" class="msg"></div>
+
+      <hr><span class="label">ACCOUNT PASSWORD</span>
+      <div class="two-input"><input id="oldAccountPass" type="password" placeholder="Current password"><input id="newAccountPass" type="password" placeholder="New password (6+ chars)"></div>
+      <button id="changeAccountPass" type="button" class="ghost">Change my password</button><div id="passMsg" class="msg"></div>
+      <section id="adminUsers" class="admin-users hidden"><hr><span class="label">ADMIN</span><h4>Create account</h4><div class="three-input"><input id="newDisplay" placeholder="Display name"><input id="newUser" placeholder="Username"><input id="newPass" type="password" placeholder="Password"></div><label class="check"><input id="newAdmin" type="checkbox"> Admin</label><label class="check"><input id="openCreatedUser" type="checkbox" checked> Open this account after creating</label><button id="createUser" type="button" class="ghost">Create user</button><div id="userMsg" class="msg"></div></section>
+    </form>
+  </dialog>
+
+  <dialog id="sourceDialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-head"><div><span class="label">REMOTE LIBRARY</span><h3>Add WebDAV / FTP / Jellyfin</h3></div><button value="cancel" class="ghost">✕</button></div>
+      <input id="srcName" placeholder="Name, e.g. NAS Music">
+      <select id="srcKind"><option value="webdav">WebDAV</option><option value="ftp">FTP / FTPS</option><option value="jellyfin">Jellyfin</option></select>
+      <input id="srcUrl" placeholder="https://dav.example.com/music/ or ftp://host/music/">
+      <input id="srcRoot" placeholder="Root folder (optional)">
+      <input id="srcUser" placeholder="Username">
+      <input id="srcPass" type="password" placeholder="Password">
+      <p id="sourceHelp" class="settings-note">WebDAV supports Basic/Digest auth. FTP supports FTP/FTPS.</p>
+      <div id="sourceMsg" class="msg"></div><div class="dialog-actions"><button id="testSource" type="button" class="ghost">Test connection</button> <button id="saveSource" type="button">Save source</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="aiDialog">
+    <div class="dialog-card ai-dialog-card">
+      <div class="dialog-head"><div><span class="label">DJ AI ADVISER</span><h3>Ask what should play next</h3></div><button id="closeAI" class="ghost">✕</button></div>
+      <div class="ai-quick"><button class="ghost tiny" data-ai-prompt="What should I play next? Give me 3 exact options from my library and say why.">What next?</button><button class="ghost tiny" data-ai-prompt="Review my current queue and suggest a better order for energy and flow. Do not invent tracks that are not in my library.">Balance set</button><button class="ghost tiny" data-ai-prompt="The party needs energy right now. Suggest 5 exact tracks or folders from my library that would be useful next.">Party rescue</button></div>
+      <textarea id="aiQuestion" rows="4" placeholder="e.g. We have been playing rock for 40 minutes — what should I put next?"></textarea>
+      <div class="dialog-actions"><button id="askAI" type="button">Ask DJ AI</button></div>
+      <div id="aiAskMsg" class="msg"></div>
+      <pre id="aiAnswer" class="ai-answer">AI advice will appear here. It never changes the queue automatically.</pre>
+    </div>
+  </dialog>
+
+  <script src="/static/app.js?v=2.0.0-beta29"></script>
+</body>
+</html>

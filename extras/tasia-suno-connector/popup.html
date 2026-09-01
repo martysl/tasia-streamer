@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tasia Suno Connector</title><link rel="stylesheet" href="popup.css"></head><body>
+  <main>
+    <h1>☀ Tasia Suno Connector</h1>
+    <p class="hint">Connect your own Suno browser session to your own Tasia Streamer.</p>
+    <label>Tasia Streamer URL<input id="tasiaUrl" placeholder="https://radio.example.com"></label>
+    <label>Connector key<input id="connectorKey" type="password" placeholder="Paste from Tasia Settings"></label>
+    <div class="buttons"><button id="save">Save & Sync</button><button id="openSuno" class="ghost">Open Suno</button></div>
+    <div id="status" class="status">Not configured.</div>
+    <p class="tiny">The Suno Bearer token stays in Chrome storage and is sent only to the Streamer URL you configure. It is never displayed in this popup.</p>
+  </main><script src="popup.js"></script>
+</body></html>

@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>Tasia Streamer — Your radio. Your music. Your rules.</title>
+  <meta name="description" content="A self-hosted DJ and AutoDJ workstation with drag-and-drop queues, folders, Suno, WebDAV, FTP, multi-user profiles, addons and optional AI DJ advice." />
+  <link rel="stylesheet" href="/static/landing.css" />
+</head>
+<body>
+  <div class="noise"></div>
+
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Tasia Streamer home">
+      <span class="brand-mark">T</span>
+      <span class="brand-copy">
+        <strong>Tasia Streamer</strong>
+        <small>self-hosted DJ workstation</small>
+      </span>
+    </a>
+
+    <nav class="nav">
+      <a href="#features">Features</a>
+      <a href="#addons">Addons</a>
+      <a href="#ai">AI DJ</a>
+      <a href="#selfhost">Self-hosted</a>
+    </nav>
+
+    <a id="topCta" class="btn btn-small btn-ghost" href="/login">Sign in</a>
+  </header>
+
+  <main id="top">
+    <section class="hero section">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="pulse"></span> Live radio without the boring bits</div>
+        <h1>Your radio.<br><span>Your music.</span><br>Your rules.</h1>
+        <p class="lead">
+          Tasia Streamer is a self-hosted DJ and AutoDJ workstation built for parties,
+          personal stations and small radio setups — with a fast library browser,
+          drag-and-drop queues, remote music sources and optional AI DJ advice.
+        </p>
+
+        <div class="hero-actions">
+          <a id="heroCta" class="btn btn-primary" href="/login">Launch your station</a>
+          <a class="btn btn-secondary" href="#preview">See the workstation</a>
+        </div>
+
+        <div class="hero-badges">
+          <span>🐳 Docker friendly</span>
+          <span>🎚️ Liquidsoap powered</span>
+          <span>👥 Multi-user</span>
+          <span>🧩 Addon ready</span>
+        </div>
+      </div>
+
+      <div class="hero-visual" id="preview">
+        <div class="glow glow-a"></div>
+        <div class="glow glow-b"></div>
+
+        <div class="workstation">
+          <div class="ws-top">
+            <div>
+              <b>TASIA STREAMER</b>
+              <span class="live-dot">LIVE</span>
+            </div>
+            <div class="ws-clock" id="clock">20:41</div>
+          </div>
+
+          <div class="ws-grid">
+            <section class="panel library-panel">
+              <div class="panel-head">
+                <span>LIBRARY</span>
+                <span class="tiny">🔎 Search</span>
+              </div>
+              <div class="folder">📁 Party Mixes <small>143 tracks</small></div>
+              <div class="folder">📁 Sci-Fi Night <small>82 tracks</small></div>
+              <div class="folder active">📁 Suno Stuff <small>91 tracks</small></div>
+              <div class="track">
+                <span class="art a1"></span>
+                <div><b>Neon Orbit</b><small>Martynka Mouse</small></div>
+                <em>3:42</em>
+              </div>
+              <div class="track">
+                <span class="art a2"></span>
+                <div><b>Pizza Nebula</b><small>Tasia & Friends</small></div>
+                <em>4:08</em>
+              </div>
+              <div class="track">
+                <span class="art a3"></span>
+                <div><b>Backroom Disco</b><small>Mouseband</small></div>
+                <em>3:16</em>
+              </div>
+            </section>
+
+            <section class="panel onair-panel">
+              <div class="panel-head">
+                <span>ACTUALLY ON AIR</span>
+                <span class="tiny green">CONNECTED</span>
+              </div>
+
+              <div class="now-card">
+                <div class="cover">
+                  <div class="cover-ring"></div>
+                  <span>♫</span>
+                </div>
+                <div class="now-copy">
+                  <small>NOW PLAYING</small>
+                  <h3>Neon Orbit</h3>
+                  <p>Martynka Mouse</p>
+                </div>
+              </div>
+
+              <div class="progress">
+                <span style="width:62%"></span>
+              </div>
+              <div class="time-row"><span>2:18</span><span>3:42</span></div>
+
+              <div class="transport">
+                <button>◀◀</button>
+                <button class="play">▶</button>
+                <button>Ⅱ</button>
+                <button>■</button>
+                <button>▶▶</button>
+              </div>
+
+              <div class="queue-head">
+                <b>QUEUE</b>
+                <span>1h 24m · ends 22:05</span>
+              </div>
+
+              <div class="queue-item locked">
+                <span class="drag">⋮⋮</span>
+                <span class="num">1</span>
+                <div><b>Pizza Nebula</b><small>20:45 · ON DECK</small></div>
+                <span class="duration">4:08</span>
+              </div>
+
+              <div class="queue-item">
+                <span class="drag">⋮⋮</span>
+                <span class="num">2</span>
+                <div><b>Backroom Disco</b><small>20:49</small></div>
+                <span class="duration">3:16</span>
+              </div>
+
+              <div class="queue-item">
+                <span class="drag">⋮⋮</span>
+                <span class="num">3</span>
+                <div><b>Portal Sunshine</b><small>20:52</small></div>
+                <span class="duration">4:21</span>
+              </div>
+            </section>
+
+            <section class="panel tools-panel">
+              <div class="panel-head">
+                <span>PLAYLIST</span>
+                <span class="tiny">SET 01</span>
+              </div>
+
+              <div class="mini-stat">
+                <span>Set length</span>
+                <b>2h 03m</b>
+              </div>
+              <div class="mini-stat">
+                <span>Starts</span>
+                <b>20:41</b>
+              </div>
+              <div class="mini-stat">
+                <span>Ends</span>
+                <b>22:44</b>
+              </div>
+
+              <div class="tool-card ai">
+                <span>✨</span>
+                <div>
+                  <b>DJ AI Adviser</b>
+                  <small>“What should I play next?”</small>
+                </div>
+              </div>
+
+              <div class="tool-card">
+                <span>☀</span>
+                <div>
+                  <b>Suno</b>
+                  <small>Paste a song link</small>
+                </div>
+              </div>
+
+              <div class="tool-card">
+                <span>☁</span>
+                <div>
+                  <b>WebDAV / FTP / Jellyfin</b>
+                  <small>Browse remote folders</small>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="strip">
+      <span>LOCAL MUSIC</span>
+      <span>SUNO</span>
+      <span>WEBDAV</span>
+      <span>FTP / FTPS</span>
+      <span>JELLYFIN</span>
+      <span>UNIVERSAL SEARCH</span>
+      <span>AUDIUS</span>
+      <span>JAMENDO</span>
+      <span>STREMIO ADDONS</span>
+      <span>SHOUTCAST</span>
+      <span>OPENAI-COMPATIBLE AI</span>
+      <span>LIQUIDSOAP</span>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-heading">
+        <div class="eyebrow">Built for actual DJ use</div>
+        <h2>Everything visible. Everything reachable.</h2>
+        <p>No tab maze. No tiny mystery controls. Tasia Streamer keeps the important parts of a live set on one screen.</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature big">
+          <div class="icon">🎛️</div>
+          <h3>SAM-style workstation layout</h3>
+          <p>Library on the left, live deck and queue in the middle, set tools and sources on the right.</p>
+          <div class="mini-ui">
+            <span></span><span></span><span></span>
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="icon">↕️</div>
+          <h3>Drag & drop queue</h3>
+          <p>Reorder songs naturally. Prefetched tracks stay visibly locked so the UI never lies about what plays next.</p>
+        </article>
+
+        <article class="feature">
+          <div class="icon">📁</div>
+          <h3>Folders that behave like folders</h3>
+          <p>Browse subfolders, search globally, save favourites from Suno/online/remote sources, or queue an entire folder tree in one click for party mode.</p>
+        </article>
+
+        <article class="feature">
+          <div class="icon">⏱️</div>
+          <h3>Set timing & ETA</h3>
+          <p>See total queue time, playlist length, predicted play time for every track and when your set ends.</p>
+        </article>
+
+        <article class="feature">
+          <div class="icon">👥</div>
+          <h3>Real multi-user separation</h3>
+          <p>Each account gets its own music root, queue, playlist, stream profile, remote sources and settings.</p>
+        </article>
+
+        <article class="feature">
+          <div class="icon">🌐</div>
+          <h3>Bring your own library</h3>
+          <p>Local folders, Universal Search, Suno, WebDAV, FTP/FTPS, Jellyfin, Audius, Jamendo and direct-stream Stremio addons all feed into the same stable queue.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section addon-section" id="addons">
+      <div class="addon-copy">
+        <div class="eyebrow">Pimp-my-DJ, basically</div>
+        <h2>Sources and tools as addons.</h2>
+        <p>
+          The playout core stays boring and reliable. Extra music sources, browsers, generators
+          and DJ helpers can plug into the workstation without rewriting the radio engine every time.
+        </p>
+
+        <div class="addon-flow">
+          <span>ADDONS</span><b>→</b><span>TRACK</span><b>→</b><span>QUEUE</span><b>→</b><span>LIQUIDSOAP</span><b>→</b><span>SHOUTCAST</span>
+        </div>
+      </div>
+
+      <div class="addon-list">
+        <div class="addon enabled"><span>☀</span><div><b>Suno Music</b><small>Links → authenticated Suno API → cache → queue</small></div><em>ON</em></div>
+        <div class="addon enabled"><span>☁</span><div><b>WebDAV Browser</b><small>Remote folders and files</small></div><em>ON</em></div>
+        <div class="addon enabled"><span>⇅</span><div><b>FTP / FTPS</b><small>Remote music libraries</small></div><em>ON</em></div>
+        <div class="addon enabled"><span>✨</span><div><b>AI DJ Adviser</b><small>OpenAI-compatible endpoint</small></div><em>ON</em></div>
+        <div class="addon enabled"><span>▰</span><div><b>Jellyfin</b><small>User login · browse · search · cache</small></div><em>ON</em></div>
+        <div class="addon enabled"><span>☁</span><div><b>Universal Search</b><small>Search + your MP3 API · private cache</small></div><em>ON</em></div>
+        <div class="addon enabled"><span>◉</span><div><b>Audius</b><small>Public music catalog and streams</small></div><em>ON</em></div>
+        <div class="addon enabled"><span>♫</span><div><b>Jamendo</b><small>Catalog · licenses · audio streams</small></div><em>ON</em></div>
+        <div class="addon enabled"><span>🧩</span><div><b>Stremio Addons</b><small>Manifest catalogs · direct HTTP(S) streams</small></div><em>ON</em></div>
+      </div>
+    </section>
+
+    <section class="section ai-section" id="ai">
+      <div class="ai-orb">✨</div>
+      <div>
+        <div class="eyebrow">Optional, not bossy</div>
+        <h2>Ask your own AI for DJ advice.</h2>
+        <p>
+          Point Tasia Streamer at an OpenAI-compatible Base URL, choose your model, and keep the API key server-side.
+          Ask what to play next, how to balance the set or how to rescue a party that suddenly went weird.
+        </p>
+        <div class="prompt-row">
+          <button>What should I play next?</button>
+          <button>Balance this set</button>
+          <button>Party rescue</button>
+        </div>
+        <small class="muted">Advice-only by default. The AI does not secretly reorder or start your queue.</small>
+      </div>
+    </section>
+
+    <section class="section selfhost-section" id="selfhost">
+      <div class="terminal">
+        <div class="terminal-bar"><i></i><i></i><i></i><span>tasia-streamer</span></div>
+        <pre><code>$ docker compose up -d
+
+✓ web workstation
+✓ per-user libraries
+✓ Liquidsoap engine
+✓ SHOUTcast output
+✓ Suno / WebDAV / FTP / Jellyfin
+✓ Universal Search + MP3 API / Audius / Jamendo / Stremio addons
+✓ optional AI adviser
+
+Tasia Streamer is ready 🍕</code></pre>
+      </div>
+
+      <div>
+        <div class="eyebrow">Your server, your credentials</div>
+        <h2>Self-hosted from the start.</h2>
+        <p>
+          Keep your music, stream password and remote source credentials on infrastructure you control.
+          Use Docker, mount your music folder, configure SHOUTcast and go.
+        </p>
+        <ul class="checklist">
+          <li>No mandatory cloud account</li>
+          <li>Per-user private libraries</li>
+          <li>Server-side credential storage</li>
+          <li>Designed for local and private AI endpoints</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="cta section" id="get-started">
+      <div class="cta-card">
+        <span class="pizza">🍕</span>
+        <div>
+          <div class="eyebrow">Ready when the party is</div>
+          <h2>Put the music on. Tasia handles the desk.</h2>
+          <p>Self-hosted DJing without turning your evening into a control-panel archaeology expedition.</p>
+        </div>
+        <div class="cta-actions">
+          <a id="openCta" class="btn btn-primary" href="/login">Open workstation</a>
+          <a id="loginCta" class="btn btn-secondary" href="/login">Sign in</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="brand footer-brand">
+      <span class="brand-mark">T</span>
+      <span class="brand-copy">
+        <strong>Tasia Streamer</strong>
+        <small>Made for music, parties and tiny amounts of chaos.</small>
+      </span>
+    </div>
+    <p>Self-hosted DJ workstation · <span id="year"></span></p>
+  </footer>
+
+  <script src="/static/landing.js"></script>
+</body>
+</html>

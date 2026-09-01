@@ -1,0 +1,18 @@
+services:
+  tasia-streamer:
+    build: .
+    container_name: tasia-streamer
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${WEB_PORT:-8787}:8080"
+    volumes:
+      - ./music:/music
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

@@ -1,0 +1,10 @@
+# Saturday party set
+# Plain names are matched against your local library first, then Universal Search.
+Queen - Don't Stop Me Now
+Lady Gaga - Bad Romance
+
+# YouTube / Spotify links also work through Universal Search
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+
+# Suno share link or bare UUID
+# https://suno.com/song/00000000-0000-0000-0000-000000000000
