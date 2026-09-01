@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import tempfile
 import time
+import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -11,6 +13,7 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from starlette.background import BackgroundTask
 
 from . import btch, catalogs, db
 from .config import USER_DATA_DIR
@@ -322,10 +325,27 @@ def spotify_connector_status(body: SpotifyConnectorStatusIn):
 
 @router.get("/api/spotify/connector/download")
 def spotify_connector_download():
-    path = Path(__file__).resolve().parent.parent / "extras" / "tasia-spotify-connector.zip"
-    if not path.exists():
-        raise HTTPException(404, "Tasia Spotify Connector ZIP is missing from this build")
-    return FileResponse(path, media_type="application/zip", filename="tasia-spotify-connector.zip")
+    source = Path(__file__).resolve().parent.parent / "extras" / "tasia-spotify-connector"
+    if not source.is_dir():
+        raise HTTPException(404, "Tasia Spotify Connector sources are missing from this build")
+    handle = tempfile.NamedTemporaryFile(prefix="tasia-spotify-connector-", suffix=".zip", delete=False)
+    archive = Path(handle.name)
+    handle.close()
+    try:
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for path in sorted(source.rglob("*")):
+                if path.is_file():
+                    arcname = Path("tasia-spotify-connector") / path.relative_to(source)
+                    zf.write(path, arcname.as_posix())
+    except Exception:
+        archive.unlink(missing_ok=True)
+        raise
+    return FileResponse(
+        archive,
+        media_type="application/zip",
+        filename="tasia-spotify-connector.zip",
+        background=BackgroundTask(archive.unlink, missing_ok=True),
+    )
 
 
 def install_spotify_bridge() -> None:
