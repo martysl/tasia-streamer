@@ -6,6 +6,8 @@
   "permissions": ["storage", "webRequest", "alarms", "tabs"],
   "host_permissions": [
     "https://api.spotify.com/*",
+    "https://api-partner.spotify.com/*",
+    "https://spclient.wg.spotify.com/*",
     "https://open.spotify.com/*"
   ],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
