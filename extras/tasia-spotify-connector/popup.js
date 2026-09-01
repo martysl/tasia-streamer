@@ -70,7 +70,7 @@ $('sync').onclick = async () => {
     chrome.runtime.sendMessage({action:'syncNow'}, result => {
       if (chrome.runtime.lastError) return message(chrome.runtime.lastError.message);
       if (!result?.ok) return message(result?.error || 'No current token. Press Refresh token now.');
-      message(result.payload ? 'Spotify token synced to Tasia.' : 'Spotify refresh started. Keep your Spotify account logged in.', true);
+      message(result.payload ? 'Spotify token synced to Tasia.' : 'Spotify token-page refresh started.', true);
       setTimeout(load, 800);
     });
   } catch (e) { message(e.message || String(e)); }
@@ -79,17 +79,17 @@ $('sync').onclick = async () => {
 $('refresh').onclick = async () => {
   try {
     await saveSettings();
-    message('Refreshing via Spotify web player…', true);
+    message('Refreshing the spotDL-compatible Spotify token…', true);
     chrome.runtime.sendMessage({action:'refreshNow'}, result => {
       if (chrome.runtime.lastError) return message(chrome.runtime.lastError.message);
-      if (!result?.ok) return message(result?.error || 'Could not start Spotify refresh');
-      message('Spotify helper started. A fresh token will sync automatically when the web player makes its API request.', true);
+      if (!result?.ok) return message(result?.error || 'Could not start Spotify token refresh');
+      message('Spotify developer token page started. A fresh token will sync automatically when it appears.', true);
       setTimeout(load, 1200);
     });
   } catch (e) { message(e.message || String(e)); }
 };
 
-$('openSpotify').onclick = () => chrome.tabs.create({url:'https://open.spotify.com/', active:true});
+$('openSpotify').onclick = () => chrome.tabs.create({url:'https://developer.spotify.com/', active:true});
 $('autoRefresh').onchange = () => chrome.storage.local.set({autoRefresh:$('autoRefresh').checked});
 
 load();
