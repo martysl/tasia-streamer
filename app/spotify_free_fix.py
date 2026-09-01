@@ -7,15 +7,18 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import btch, catalogs
+from . import btch, catalogs, media as media_module
 from .config import USER_DATA_DIR
 
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 CACHE_MAX_ENTRIES = 500
+_BTCH_SENTINEL = "tasia-btch-spotify:"
 
 _client = None
 _client_lock = threading.RLock()
 _cache_lock = threading.RLock()
+_track_lock = threading.RLock()
+_track_cache: dict[str, dict] = {}
 _installed = False
 
 
@@ -68,6 +71,22 @@ def _save_cache(settings: dict, payload: dict) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     tmp.replace(path)
+
+
+def _remember_tracks(rows: list[dict]) -> None:
+    with _track_lock:
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            tid = str(row.get("id") or "").strip()
+            if tid:
+                _track_cache[tid] = dict(row)
+
+
+def _remembered_track(track_id: str) -> dict | None:
+    with _track_lock:
+        row = _track_cache.get(str(track_id or "").strip())
+        return dict(row) if isinstance(row, dict) else None
 
 
 def _cached_search(settings: dict, query: str, limit: int) -> list[dict] | None:
@@ -191,9 +210,11 @@ def spotify_search(settings: dict, query: str, limit: int = 30) -> list[dict]:
 
     cached = _cached_search(settings, query, limit)
     if cached is not None:
+        _remember_tracks(cached)
         return cached
 
     rows = _live_search(query, limit)
+    _remember_tracks(rows)
     _store_search(settings, query, rows)
     return rows
 
@@ -205,7 +226,9 @@ def install() -> None:
     _installed = True
 
     original_search = catalogs.search
+    original_get_track = catalogs.get_track
     original_test = catalogs.test
+    original_cache_remote_audio = media_module.cache_remote_audio
 
     def search(provider: str, settings: dict, query: str, limit: int = 30) -> list[dict]:
         provider = str(provider or "").lower()
@@ -215,8 +238,45 @@ def install() -> None:
         raw = str(query or "").strip()
         parsed = urlparse(raw)
         if parsed.scheme in {"http", "https"} and parsed.netloc:
-            return [btch.resolve(provider, raw)]
+            rows = [btch.resolve(provider, raw)]
+            _remember_tracks(rows)
+            return rows
         return spotify_search(settings, raw, limit)
+
+    def get_track(provider: str, settings: dict, track_id: str) -> dict:
+        provider = str(provider or "").lower()
+        if provider != "btch-spotify":
+            return original_get_track(provider, settings, track_id)
+
+        remembered = _remembered_track(track_id)
+        if remembered is None:
+            return original_get_track(provider, settings, track_id)
+
+        # A search result already contains every field needed to store a playlist
+        # reference. Do not immediately run BTCH a second time just to recover the
+        # same title/artist metadata. Queueing/playback still resolves through BTCH
+        # below, exactly when actual audio is needed.
+        url = str(remembered.get("url") or "").strip()
+        if not url:
+            try:
+                url = btch.unpack_url(str(track_id))
+            except Exception:
+                url = ""
+        row = dict(remembered)
+        if url:
+            row["media_url"] = _BTCH_SENTINEL + url
+        return row
+
+    def cache_remote_audio(url: str, user_id: int, filename_hint: str | None = None):
+        raw = str(url or "")
+        if raw.startswith(_BTCH_SENTINEL):
+            spotify_url = raw[len(_BTCH_SENTINEL):]
+            resolved = btch.resolve("btch-spotify", spotify_url)
+            media_url = str(resolved.get("media_url") or "").strip()
+            if not media_url:
+                raise ValueError("BTCH Spotify resolver returned no playable media URL")
+            return original_cache_remote_audio(media_url, user_id, filename_hint=filename_hint)
+        return original_cache_remote_audio(url, user_id, filename_hint=filename_hint)
 
     def test(provider: str, settings: dict) -> dict:
         provider = str(provider or "").lower()
@@ -235,4 +295,6 @@ def install() -> None:
         }
 
     catalogs.search = search
+    catalogs.get_track = get_track
     catalogs.test = test
+    media_module.cache_remote_audio = cache_remote_audio
