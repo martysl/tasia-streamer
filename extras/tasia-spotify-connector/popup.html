@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tasia Spotify Connector</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <div class="brand"><span>♥</span><div><strong>Tasia Spotify Connector</strong><small>Spotify search token bridge</small></div></div>
+    <p class="hint">Keeps Spotify text search alive without a Spotify developer app. Spotify links still use BTCH.</p>
+
+    <label>Tasia Streamer URL
+      <input id="tasiaUrl" placeholder="https://radio.example.com">
+    </label>
+    <label>Connector key
+      <input id="connectorKey" type="password" placeholder="Use your Tasia connector key">
+    </label>
+    <label class="check"><input id="autoRefresh" type="checkbox" checked> Auto-refresh before the token expires</label>
+
+    <div class="buttons">
+      <button id="save">Save</button>
+      <button id="sync" class="ghost">Sync now</button>
+      <button id="refresh" class="ghost">Refresh token now</button>
+    </div>
+    <button id="openSpotify" class="wide ghost">Open Spotify Web Player</button>
+
+    <section class="status">
+      <div><span>Browser token</span><strong id="tokenStatus">—</strong></div>
+      <div><span>Tasia server</span><strong id="serverStatus">—</strong></div>
+      <div><span>7-day cache</span><strong id="cacheStatus">—</strong></div>
+    </section>
+    <div id="message" class="message"></div>
+    <p class="tiny">The connector only forwards the Spotify Bearer token it sees in your own logged-in Spotify web player to the Tasia Streamer URL you approve.</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
