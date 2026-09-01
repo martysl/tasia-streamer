@@ -5,3 +5,4 @@ python-multipart==0.0.20
 mutagen==1.47.0
 
 yt-dlp[default]==2026.7.4
+spotipyFree>=1.9.13,<2
