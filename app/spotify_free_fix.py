@@ -109,13 +109,13 @@ def _free_client(*, reset: bool = False):
                 from SpotipyFree import Spotify as FreeSpotify
             except Exception as exc:
                 raise catalogs.CatalogError(
-                    "Spotify search backend is unavailable: spotipyFree is not installed"
+                    f"Spotify search backend import failed: {type(exc).__name__}: {exc}"
                 ) from exc
             try:
                 _client = FreeSpotify()
             except Exception as exc:
                 raise catalogs.CatalogError(
-                    f"Spotify search backend could not start: {exc}"
+                    f"Spotify search backend could not start: {type(exc).__name__}: {exc}"
                 ) from exc
         return _client
 
