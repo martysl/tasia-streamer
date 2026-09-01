@@ -1,4 +1,4 @@
-Tasia Spotify Connector v1.0
+Tasia Spotify Connector v1.1
 ============================
 
 Purpose
@@ -10,51 +10,54 @@ Spotify track URLs do not need this connector. They still resolve through BTCH.
 
 How it works
 ------------
-1. Stay logged into your own account in https://open.spotify.com/.
-2. The extension observes only Authorization headers sent by the Spotify web
-   player to https://api.spotify.com/.
-3. When Spotify issues a fresh short-lived Bearer token, the extension sends that
-   token only to the Tasia Streamer URL that you explicitly approve.
-4. Tasia validates it with Spotify search, stores it privately under the current
-   Tasia account, and uses it only for Spotify catalog text search.
-5. Search results are cached for 7 days. The token itself is NOT extended to 7
-   days; it remains short-lived and is refreshed when needed.
-6. Every 10 minutes the connector asks Tasia whether the token needs refreshing.
-   If needed it refreshes an existing inactive Spotify tab, or opens a temporary
-   inactive helper tab. A helper tab created by the connector closes after a new
-   token is captured and synced.
+1. Spotify's 2026 spotDL workaround uses the short-lived token shown in the code
+   example on https://developer.spotify.com/ after you log into Spotify.
+2. Tasia Spotify Connector opens/reloads that page when a fresh token is needed
+   and reads the `const token = '...'` value from the rendered code example.
+3. The token is sent only to the Tasia Streamer URL you explicitly approve.
+4. Tasia validates it against Spotify /v1/search before storing it.
+5. Search results are cached privately for 7 days. The token itself is NOT made
+   valid for 7 days; it remains short-lived (normally about one hour).
+6. Every 10 minutes the connector asks Tasia whether refresh is needed. Tasia
+   asks for refresh with 12 minutes of token life remaining, so normal expiry is
+   refreshed proactively.
+7. As a fallback, the connector can observe Bearer values used by the normal
+   Spotify web player. They are never stored unless Tasia validates them first.
 
 Setup
 -----
-1. Chrome/Chromium -> chrome://extensions
-2. Enable Developer mode.
-3. Load unpacked -> choose this tasia-spotify-connector folder.
-4. In Tasia Streamer Settings -> Suno connection, generate/copy the existing
+1. Build/run the beta30 candidate Streamer.
+2. Download:
+      /api/spotify/connector/download
+3. Extract the ZIP.
+4. Chrome/Chromium -> chrome://extensions
+5. Enable Developer mode.
+6. Load unpacked -> choose the tasia-spotify-connector folder.
+7. In Tasia Streamer Settings -> Suno connection, generate/copy the existing
    Connector key. Beta30 reuses that per-user Tasia pairing key for Spotify too.
-5. In the extension enter:
-      Tasia Streamer URL: https://your-streamer.example
-      Connector key:     <your Tasia connector key>
-6. Press Save, then Refresh token now.
-7. Keep your Spotify account logged in. You do not need to keep a Spotify tab
-   permanently open when Auto-refresh is enabled.
+8. In the extension enter your Streamer URL + connector key and press Save.
+9. Press Open Spotify token page. Log into Spotify there if needed.
+10. Press Refresh token now. Once the token is validated, Spotify text search is
+    ready and future refreshes should happen automatically.
 
 Security
 --------
-- The connector does not read your Spotify password or full cookie jar.
-- It forwards only the short-lived Spotify Bearer token seen on Spotify API
-  requests.
-- The token is sent only to the Streamer origin you approve through Chrome's
+- The connector does not receive your Spotify password.
+- It does not export your full browser cookie jar.
+- It extracts only the short-lived token exposed by Spotify's developer page,
+  plus a web-player Bearer fallback which must pass backend validation.
+- It sends the token only to the Streamer origin you approve through Chrome's
   optional host permission prompt.
-- Server-side token files are written mode 0600 when the platform supports it.
+- Server-side token files are mode 0600 when the platform supports it.
 - Treat the Tasia connector key like a password.
 
 Troubleshooting
 ---------------
 If Tasia says a fresh Spotify token is required:
-- confirm you are logged into open.spotify.com;
-- click Refresh token now in the extension;
-- if Spotify shows a login page, log in and let the web player finish loading;
+- open https://developer.spotify.com/ and make sure you are logged in;
+- confirm the page contains a code example with `const token = '...'`;
+- click Refresh token now;
 - use Sync now after a server/container restart if the browser token is still valid.
 
-The connector is intentionally for catalog metadata/search only. Playback of
-selected Spotify links remains handled by Tasia's BTCH resolver/cache pipeline.
+The connector is intentionally for Spotify catalog metadata/search only. Playback
+of selected Spotify links remains handled by Tasia's BTCH resolver/cache pipeline.
