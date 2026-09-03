@@ -196,8 +196,124 @@
     }
   }
 
+  function safeDownloadName(value) {
+    const base = String(value || 'Suno track')
+      .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 140) || 'Suno track';
+    return `${base}.mp3`;
+  }
+
+  async function downloadCachedSuno() {
+    const url = $('sunoUrl')?.value.trim() || '';
+    const title = $('sunoTitle')?.value.trim() || '';
+    const artist = $('sunoArtist')?.value.trim() || '';
+    const msg = $('sunoMsg');
+    const button = $('sunoDownload');
+    if (!url) {
+      msg.className = 'msg bad';
+      msg.textContent = 'Paste a Suno link, UUID or direct audio URL first.';
+      return;
+    }
+
+    let temporaryPlaylistId = null;
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Caching…';
+    msg.className = 'msg';
+    msg.textContent = 'Caching Suno audio for browser download…';
+
+    try {
+      // Reuse the exact same resolver/cache path as the normal Suno Playlist
+      // button, but keep the reference only long enough to access the private
+      // cached file. Nothing is sent to Queue or playback.
+      const cached = await api('/api/playlist/url', jsonOpts('POST', {
+        url,
+        title: title || null,
+        artist: artist || null
+      }));
+      temporaryPlaylistId = Number(cached?.playlist_id || 0) || null;
+      if (!temporaryPlaylistId) throw new Error('Tasia cached the track but returned no temporary playlist id.');
+
+      button.textContent = 'Downloading…';
+      const response = await fetch(`/api/playlist/${temporaryPlaylistId}/preview`, {credentials: 'same-origin'});
+      if (!response.ok) {
+        let detail = `HTTP ${response.status}`;
+        try {
+          const data = await response.json();
+          detail = data?.detail || detail;
+        } catch (_) {}
+        throw new Error(detail);
+      }
+
+      const blob = await response.blob();
+      if (!blob.size) throw new Error('Cached Suno file is empty.');
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = safeDownloadName(title || `Suno-${Date.now()}`);
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+
+      msg.className = 'msg good';
+      msg.textContent = 'Cached + downloaded in your browser. Nothing was queued or played.';
+      try { await loadLibrary(); } catch (_) {}
+    } catch (e) {
+      msg.className = 'msg bad';
+      msg.textContent = `Download failed: ${e.message || e}`;
+    } finally {
+      if (temporaryPlaylistId) {
+        try { await api(`/api/playlist/${temporaryPlaylistId}`, {method: 'DELETE'}); } catch (_) {}
+      }
+      button.disabled = false;
+      button.textContent = originalLabel;
+      try { await refreshAll(); } catch (_) {}
+    }
+  }
+
+  function installPublicSunoUi() {
+    const favouriteButton = $('sunoFavorite');
+    if (favouriteButton && !$('sunoDownload')) {
+      const download = document.createElement('button');
+      download.id = 'sunoDownload';
+      download.type = 'button';
+      download.className = 'ghost';
+      download.textContent = '⬇ Download';
+      download.title = 'Cache this Suno track, then download the cached audio in the browser without playing it';
+      favouriteButton.after(download);
+      download.onclick = downloadCachedSuno;
+    }
+
+    const box = $('sunoUrl')?.closest('.suno-box');
+    if (box && !box.querySelector('.suno-public-note')) {
+      const note = document.createElement('div');
+      note.className = 'hint suno-public-note';
+      note.textContent = 'Public Suno media mode: song URLs / UUIDs can cache without Tasia Suno login. Download caches first, then saves the cached MP3 through your browser.';
+      box.appendChild(note);
+    }
+
+    // Keep the legacy auth controls in the DOM for backwards compatibility so
+    // old app.js handlers cannot crash, but remove them from the visible Settings
+    // workflow. Public clip playback no longer depends on Clerk/JWT setup.
+    const connectorField = $('sunoConnectorKey');
+    const authBlock = connectorField?.closest('.catalog-settings-block');
+    if (authBlock) authBlock.style.display = 'none';
+
+    // app.js asks for Suno auth status every time Settings opens. Override that
+    // optional UI hook so the public-media workflow does not make any Clerk/auth
+    // request just to open Settings. Legacy API routes remain available for old
+    // installations, but they are no longer part of the normal workflow.
+    window.loadSunoAuthStatus = async () => ({ok: true, public_media: true, connected: false});
+  }
+
   // app.js installs the original bulk handlers first. This file loads after it
-  // and intentionally replaces only these two long-running actions.
+  // and intentionally replaces only the long-running actions plus the Suno
+  // public-media/download workflow.
   if ($('txtImportStart')) $('txtImportStart').onclick = importOneByOne;
   if ($('queuePlaylist')) $('queuePlaylist').onclick = queuePlaylistOneByOne;
+  installPublicSunoUi();
 })();
