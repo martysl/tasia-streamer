@@ -21,6 +21,11 @@ MAX_REMOTE_BYTES = int(float(os.getenv("MAX_REMOTE_MB", "250")) * 1024 * 1024)
 SESSION_DAYS = int(os.getenv("SESSION_DAYS", "30"))
 APP_SECRET = os.getenv("APP_SECRET", "").strip()
 
+# Optional private Suno downloader used by app/suno_public_fix.py.
+# Keep the real host/key in .env; they must never be committed to the repo.
+SUNO_API_BASE = os.getenv("SUNO_API_BASE", "").strip().rstrip("/")
+SUNO_API_KEY = os.getenv("SUNO_API_KEY", "").strip()
+
 # Legacy/default values are used when the first account adopts a v1.x install.
 DEFAULT_STREAM = {
     "host": os.getenv("SHOUTCAST_HOST", "127.0.0.1"),
