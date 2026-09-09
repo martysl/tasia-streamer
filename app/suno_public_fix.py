@@ -5,10 +5,13 @@ from urllib.parse import urlparse
 
 from . import media
 
-# Current Suno playback URLs exposed by the web player and used by the
-# suno-free-download extension.  These are media delivery URLs, not generation
-# or account API endpoints, so a public /song/<uuid> can be resolved without a
-# Clerk/JWT session.
+# Tasia's public Suno downloader. It accepts a clip UUID and returns playable
+# M4A audio directly, so this is the preferred source for Tasia Streamer.
+TASIA_SUNO_M4A_TEMPLATE = "http://tasia.fresh-projects.top/sunoapi/{clip_id}"
+
+# Public Suno playback URLs retained as fallbacks. These are media delivery
+# URLs, not generation/account API endpoints, so a public /song/<uuid> can be
+# resolved without a Clerk/JWT session.
 PUBLIC_M4A_TEMPLATE = "https://d2lwuy8qc234o3.cloudfront.net/1/clip/{clip_id}.m4a"
 PUBLIC_MP3_TEMPLATE = "https://cdn1.suno.ai/{clip_id}.mp3"
 PUBLIC_M4A_RE = re.compile(
@@ -52,8 +55,12 @@ def _public_candidates(raw: str, clip_id: str) -> list[str]:
     ):
         out.append(raw)
 
+    # Prefer our own downloader. It returns M4A that FFmpeg can decode directly;
+    # cache_remote_audio() will normalize it to the streamer's cached MP3 format.
+    # Keep Suno's public delivery URLs after it as automatic fallbacks.
     out.extend(
         [
+            TASIA_SUNO_M4A_TEMPLATE.format(clip_id=clip_id),
             PUBLIC_M4A_TEMPLATE.format(clip_id=clip_id),
             PUBLIC_MP3_TEMPLATE.format(clip_id=clip_id),
         ]
@@ -69,12 +76,16 @@ def _public_candidates(raw: str, clip_id: str) -> list[str]:
 
 
 def install() -> None:
-    """Make public Suno clip playback the default resolver.
+    """Make Tasia's Suno M4A endpoint the preferred public resolver.
 
-    The old authenticated API/session machinery remains import-compatible for
-    unusual legacy/share links, but normal song URLs and UUIDs no longer require
-    a Suno login. cache_remote_audio() already understands multiple candidate
-    URLs and will validate/transcode the first playable one with FFmpeg.
+    Normal Suno song URLs and bare clip UUIDs first use Tasia's standalone
+    /sunoapi/<uuid> downloader. Public CloudFront M4A and cdn1 MP3 remain as
+    fallbacks. The old authenticated API/session machinery remains available
+    for unusual legacy/share links that do not expose a clip UUID.
+
+    cache_remote_audio() already accepts multiple candidates and validates/
+    transcodes the first playable one with FFmpeg, so no player changes are
+    required for the M4A response.
     """
 
     global _installed
