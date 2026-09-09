@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from . import media
-
-# Tasia's public Suno downloader. It accepts a clip UUID and returns playable
-# M4A audio directly, so this is the preferred source for Tasia Streamer.
-TASIA_SUNO_M4A_TEMPLATE = "http://tasia.fresh-projects.top/sunoapi/{clip_id}"
+from .config import SUNO_API_BASE, SUNO_API_KEY
 
 # Public Suno playback URLs retained as fallbacks. These are media delivery
 # URLs, not generation/account API endpoints, so a public /song/<uuid> can be
@@ -27,9 +24,6 @@ def _clip_id(value: str) -> str | None:
     if not raw:
         return None
 
-    # Keep the parser from media.py for bare UUIDs, suno.com/song/<uuid>, and
-    # cdn1.suno.ai/<uuid>.mp3, then add the progressive M4A form discovered in
-    # the extension.
     try:
         uid = media._suno_uuid_from_value(raw)
     except Exception:
@@ -41,12 +35,20 @@ def _clip_id(value: str) -> str | None:
     return match.group(1).lower() if match else None
 
 
+def _private_suno_url(clip_id: str) -> str | None:
+    if not SUNO_API_BASE or not SUNO_API_KEY:
+        return None
+    return (
+        f"{SUNO_API_BASE}/sunoapi/{clip_id}"
+        f"?apikey={quote(SUNO_API_KEY, safe='')}"
+    )
+
+
 def _public_candidates(raw: str, clip_id: str) -> list[str]:
     parsed = urlparse(raw)
     out: list[str] = []
 
-    # Preserve an explicit direct media URL first. This matters for signed
-    # links, while still giving us stable public fallbacks afterwards.
+    # Preserve an explicit direct media URL first. This matters for signed links.
     host = (parsed.hostname or "").lower()
     path = (parsed.path or "").lower()
     if parsed.scheme in {"http", "https"} and (
@@ -55,12 +57,14 @@ def _public_candidates(raw: str, clip_id: str) -> list[str]:
     ):
         out.append(raw)
 
-    # Prefer our own downloader. It returns M4A that FFmpeg can decode directly;
-    # cache_remote_audio() will normalize it to the streamer's cached MP3 format.
-    # Keep Suno's public delivery URLs after it as automatic fallbacks.
+    # Prefer the configured private downloader when both base URL and key are set.
+    private_url = _private_suno_url(clip_id)
+    if private_url:
+        out.append(private_url)
+
+    # Public fallbacks remain available if the private endpoint is unavailable.
     out.extend(
         [
-            TASIA_SUNO_M4A_TEMPLATE.format(clip_id=clip_id),
             PUBLIC_M4A_TEMPLATE.format(clip_id=clip_id),
             PUBLIC_MP3_TEMPLATE.format(clip_id=clip_id),
         ]
@@ -76,16 +80,15 @@ def _public_candidates(raw: str, clip_id: str) -> list[str]:
 
 
 def install() -> None:
-    """Make Tasia's Suno M4A endpoint the preferred public resolver.
+    """Prefer a configured private Suno downloader for public clip playback.
 
-    Normal Suno song URLs and bare clip UUIDs first use Tasia's standalone
-    /sunoapi/<uuid> downloader. Public CloudFront M4A and cdn1 MP3 remain as
-    fallbacks. The old authenticated API/session machinery remains available
-    for unusual legacy/share links that do not expose a clip UUID.
+    If SUNO_API_BASE and SUNO_API_KEY are configured, normal Suno song URLs and
+    bare UUIDs first use:
 
-    cache_remote_audio() already accepts multiple candidates and validates/
-    transcodes the first playable one with FFmpeg, so no player changes are
-    required for the M4A response.
+        {base}/sunoapi/{uuid}?apikey={key}
+
+    Public CloudFront M4A and cdn1 MP3 remain automatic fallbacks. The existing
+    authenticated resolver is still kept for unusual short/legacy share links.
     """
 
     global _installed
@@ -101,8 +104,6 @@ def install() -> None:
         if uid:
             return _public_candidates(raw, uid), uid
 
-        # Non-Suno URLs and old share forms without a visible UUID keep the
-        # existing resolver as a compatibility fallback.
         return original_resolve(raw, user_id)
 
     media.resolve_suno_candidates = resolve_suno_candidates
