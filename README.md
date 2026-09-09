@@ -2,7 +2,7 @@
 
 A compact multi-user SHOUTcast DJ workstation built around FastAPI + SQLite + FFmpeg + Liquidsoap 2.4.5.
 
-Beta29 keeps the multi-source/BTCH work and now prefers Tasia's standalone Suno M4A downloader for public Suno UUID/song playback, while retaining the older Suno resolver paths as fallbacks.
+Beta29 keeps the multi-source/BTCH work and can use a private keyed Suno downloader for public Suno UUID/song playback, while retaining the older Suno resolver paths as fallbacks.
 
 ## Multi-source search and song-list import (beta29)
 
@@ -10,34 +10,33 @@ The Online tab now has **All Sources**, which searches Spotify, Universal Search
 
 Import TXT can use a file or a pasted list. Put one song or supported URL on each line. **Find songs in** can be Auto/All or a specific service. Auto checks the private local library for an exact match first, then searches online. Spotify/SoundCloud/Google Drive/YouTube/Suno URLs are detected automatically in mixed lists.
 
-
 ## BTCH URL providers (beta28)
 
-Online / Universal now includes Spotify (BTCH), SoundCloud (BTCH), and Google Drive (BTCH). Paste a source URL, resolve it, then use Q / P / Saved like the other catalog providers. Queueing caches and validates a private MP3 copy before Liquidsoap uses it. The Docker image installs `btch-downloader@6.3.6` with Node.js.
+Online / Universal includes Spotify (BTCH), SoundCloud (BTCH), and Google Drive (BTCH). Paste a source URL, resolve it, then use Q / P / Saved like the other catalog providers. Queueing caches and validates a private MP3 copy before Liquidsoap uses it. The Docker image installs `btch-downloader@6.3.6` with Node.js.
 
 ## Suno playback (beta29 maintenance update)
 
-For normal public Suno song URLs and bare clip UUIDs, Tasia now prefers the standalone downloader:
+For normal public Suno song URLs and bare clip UUIDs, Tasia can prefer a private downloader configured only in your local `.env`:
 
 ```text
-http://tasia.fresh-projects.top/sunoapi/<UUID>
+{SUNO_API_BASE}/sunoapi/{clip_uuid}?apikey={SUNO_API_KEY}
 ```
 
-That endpoint returns playable `.m4a` audio. Tasia downloads it into the current user's private cache, FFmpeg validates/normalizes it to the streamer's cached MP3 format, and Liquidsoap plays the local file exactly like other cached sources.
+The real API host and key are intentionally **not stored in this repository**. The endpoint may return playable `.m4a`; Tasia downloads it into the current user's private cache, FFmpeg validates/normalizes it to the streamer's cached MP3 format, and Liquidsoap plays the local file exactly like other cached sources.
 
-The resolver order is:
+Resolver order when the private API is configured:
 
 ```text
-1. http://tasia.fresh-projects.top/sunoapi/<UUID>
+1. configured private Suno downloader
 2. Suno public CloudFront .m4a
-3. cdn1.suno.ai/<UUID>.mp3
+3. Suno public CDN .mp3
 ```
 
-So a normal `https://suno.com/song/<uuid>` link or bare UUID no longer needs a Suno login/session just to play the track. The existing Tasia Suno Connector / authenticated resolver is still retained for short share links such as `https://suno.com/s/...` where the UUID is not directly visible, and for legacy/compatibility cases.
+If `SUNO_API_BASE` or `SUNO_API_KEY` is empty, Tasia skips the private endpoint and uses the public fallbacks. Normal `https://suno.com/song/<uuid>` links and bare UUIDs therefore do not require the old Suno browser-session connector just to play. The connector/authenticated resolver is retained for short share links such as `https://suno.com/s/...` where the UUID is not directly visible, and for legacy compatibility.
 
 ## What's new in v2
 
-- **Public Suno UUID/song playback without login.** Paste a `suno.com/song/<uuid>` URL or bare UUID and Tasia first requests `http://tasia.fresh-projects.top/sunoapi/<uuid>`, accepts the returned M4A, validates/transcodes it with FFmpeg, and caches it privately before playout. Public Suno CloudFront M4A and CDN MP3 remain automatic fallbacks. Short `/s/...` share links can still use the older connector/authenticated resolver when needed.
+- **Private keyed Suno downloader support.** Paste a `suno.com/song/<uuid>` URL or bare UUID and, when configured, Tasia first requests `{SUNO_API_BASE}/sunoapi/<uuid>?apikey=...`, accepts the returned audio, validates/transcodes it with FFmpeg, and caches it privately before playout. Public Suno media URLs remain automatic fallbacks.
 - **SAM-style one-screen layout:** Library/Sources | On-Air + Queue | Playlist + Suno.
 - **Real folder browser:** local folders and subfolders appear directly in the song chooser. Open a folder like a file manager, or add the whole folder tree to Queue/Playlist in one click.
 - **Fast global search:** search the current user's full private library by title, artist or path without leaving the live workstation.
@@ -46,9 +45,9 @@ So a normal `https://suno.com/song/<uuid>` link or bare UUID no longer needs a S
 - **Set timing:** queue duration, set-end clock, per-track queue ETA, playlist cumulative offset and "if started now" clock.
 - **Private folder-aware local library** for every account under `./music/users/<id>-<username>/`, including all subfolders.
 - **WebDAV + FTP/FTPS + Jellyfin browser** with folders and remote search. Jellyfin uses normal per-user username/password login; selected tracks are cached locally before Queue/Playlist playout.
-- **Online catalogs:** SoundCloud, Audius, Jamendo and direct-stream Stremio addons can be searched from the workstation and added to Queue/Playlist. Their playable URLs are resolved when the track is due.
+- **Online catalogs:** SoundCloud, Audius, Jamendo and direct-stream Stremio addons can be searched from the workstation and added to Queue/Playlist.
 - **Multi-user login:** each account has its own library index, uploads/cache, queue, playlist, remote sources, settings and SHOUTcast profile.
-- **Independent radio engines:** each logged-in account can run its own Liquidsoap process, so profiles are not just cosmetic wrappers around one global queue.
+- **Independent radio engines:** each logged-in account can run its own Liquidsoap process.
 - Existing v1.x `library`, `queue`, and `playlist` tables are left untouched. The **first v2 account copies/adopts them automatically**.
 
 ## Upgrade from v1.x
@@ -118,24 +117,35 @@ Browser uploads go to that user's private `Uploads/` folder under `./music/users
 
 ## Suno
 
+### Private downloader configuration
+
+The private downloader is optional and configured only in `.env`:
+
+```env
+SUNO_API_BASE=https://your-private-api.example
+SUNO_API_KEY=your-secret-key
+```
+
+Tasia constructs the request internally as:
+
+```text
+{SUNO_API_BASE}/sunoapi/{clip_uuid}?apikey={SUNO_API_KEY}
+```
+
+Do not commit real values to `.env.example`, README, screenshots or logs. The key is sent in the query string because that is the current downloader API contract; remember that query strings may appear in reverse-proxy/access logs, so protect those logs as secrets too.
+
 ### Normal public song URLs / UUIDs
 
-These inputs use the new public playback path and do **not** require a Suno account/session:
+Accepted inputs include:
 
 ```text
 https://suno.com/song/453a796e-a8e2-4d28-b24f-40f956cb5321
 453a796e-a8e2-4d28-b24f-40f956cb5321
 ```
 
-Tasia extracts the UUID and tries these playable candidates in order:
+When the private downloader is configured, Tasia tries it first. If it is missing or fails, public Suno M4A/MP3 media candidates are tried automatically.
 
-```text
-http://tasia.fresh-projects.top/sunoapi/<UUID>
-https://d2lwuy8qc234o3.cloudfront.net/1/clip/<UUID>.m4a
-https://cdn1.suno.ai/<UUID>.mp3
-```
-
-The preferred Tasia endpoint returns `.m4a`. `cache_remote_audio()` downloads the first usable candidate into the current user's private cache, FFmpeg verifies it contains playable audio and converts it to the streamer's normal cached MP3 format. Liquidsoap therefore receives a local validated file and does not need any special M4A handling.
+`cache_remote_audio()` downloads the first usable candidate into the current user's private cache, FFmpeg verifies it contains playable audio and converts it to the streamer's normal cached MP3 format. Liquidsoap therefore receives a local validated file and does not need any special M4A handling.
 
 ### Short share links / compatibility fallback
 
@@ -239,19 +249,20 @@ docker compose down
 
 - Liquidsoap telnet and metadata ports are bound inside the container only and are not published by Docker Compose.
 - Each user engine gets its own internal control/metadata ports.
-- Direct HTTP/Suno and WebDAV/FTP/Jellyfin audio is cached/validated before playout. Public Suno UUID/song playback prefers Tasia's standalone M4A downloader, then falls back to Suno's public media URLs.
+- Direct HTTP/Suno and WebDAV/FTP/Jellyfin audio is cached/validated before playout.
+- A configured private Suno downloader is preferred for UUID/song playback, with public Suno media candidates as fallbacks.
 - `ALLOW_PRIVATE_URLS=false` applies to direct HTTP/Suno and Stremio addon/stream URLs. WebDAV/FTP/Jellyfin sources are explicit authenticated user configuration and may point to a LAN/NAS.
 
 ## Private user music folders
+
 Each account owns one local folder under `/music/users/<id>-<username>/`. Put folders and songs anywhere under that root and press **Scan**. Other accounts cannot browse or queue those files. Uploaded files are stored in that account's `Uploads/` subfolder.
 
 When upgrading from beta1/v1, existing top-level `/music` content is moved once into the first account's private folder. Beta3 also repairs stale beta2 database paths on startup so queued songs continue to point at the moved files.
 
-
 ### Universal Search + MP3 converter (beta10)
 
-The Online / Universal chooser can search by song/artist text or accept a YouTube/Spotify link. yt-dlp is used only to discover YouTube results. When Q/P is pressed, Tasia sends the chosen YouTube URL to the per-user MP3 converter API (default `https://yapi.is-on.click/api/convert`), streams the returned audio into the private user cache, validates/normalizes it with FFmpeg, then inserts the local MP3 into Queue/Playlist. Spotify links use Spotify oEmbed for basic title metadata only; Spotify is not used as the audio transport. Optional Netscape-format YouTube search `cookies.txt` can be uploaded in Settings and is stored per user under `/data/users/<id>/secrets/`.
-
+The Online / Universal chooser can search by song/artist text or accept a YouTube/Spotify link. yt-dlp is used only to discover YouTube results. When Q/P is pressed, Tasia sends the chosen YouTube URL to the per-user MP3 converter API, streams the returned audio into the private user cache, validates/normalizes it with FFmpeg, then inserts the local MP3 into Queue/Playlist. Spotify links use Spotify oEmbed for basic title metadata only; Spotify is not used as the audio transport. Optional Netscape-format YouTube search `cookies.txt` can be uploaded in Settings and is stored per user under `/data/users/<id>/secrets/`.
 
 ### TXT set import
+
 Use **Import TXT** in the Playlist panel. One song or link per line; blank lines and `# comments` are ignored. Imports can target Playlist, Queue or Saved / Favourites.
