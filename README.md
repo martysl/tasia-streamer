@@ -2,7 +2,7 @@
 
 A compact multi-user SHOUTcast DJ workstation built around FastAPI + SQLite + FFmpeg + Liquidsoap 2.4.5.
 
-Beta28 keeps the full beta27 Suno stack and adds btch-downloader URL providers for Spotify, SoundCloud and Google Drive.
+Beta29 keeps the multi-source/BTCH work and now prefers Tasia's standalone Suno M4A downloader for public Suno UUID/song playback, while retaining the older Suno resolver paths as fallbacks.
 
 ## Multi-source search and song-list import (beta29)
 
@@ -15,17 +15,29 @@ Import TXT can use a file or a pasted list. Put one song or supported URL on eac
 
 Online / Universal now includes Spotify (BTCH), SoundCloud (BTCH), and Google Drive (BTCH). Paste a source URL, resolve it, then use Q / P / Saved like the other catalog providers. Queueing caches and validates a private MP3 copy before Liquidsoap uses it. The Docker image installs `btch-downloader@6.3.6` with Node.js.
 
-## Suno (beta27)
+## Suno playback (beta29 maintenance update)
 
-Suno uses a refreshable browser-session bridge. Install the bundled **Tasia Suno Connector v1.1**, pair it with the per-user connector key, and keep your own browser logged into suno.com. The connector forwards only Suno's Clerk `__client` session value and device ID to the Tasia Streamer URL you explicitly approve. Docker exchanges that session for fresh JWTs via Clerk and can refresh them without running a browser inside the container.
+For normal public Suno song URLs and bare clip UUIDs, Tasia now prefers the standalone downloader:
 
-Track playback resolves the UUID through Suno's authenticated feed API and caches the returned `audio_url` locally before Liquidsoap sees it. Tasia no longer constructs raw `cdn1.suno.ai/<uuid>.mp3` URLs.
+```text
+http://tasia.fresh-projects.top/sunoapi/<UUID>
+```
 
-A manual `__client` paste is available in Settings for headless/manual setups. Treat that value like a password. Legacy Bearer and signed-cookie modes remain only for compatibility.
+That endpoint returns playable `.m4a` audio. Tasia downloads it into the current user's private cache, FFmpeg validates/normalizes it to the streamer's cached MP3 format, and Liquidsoap plays the local file exactly like other cached sources.
+
+The resolver order is:
+
+```text
+1. http://tasia.fresh-projects.top/sunoapi/<UUID>
+2. Suno public CloudFront .m4a
+3. cdn1.suno.ai/<UUID>.mp3
+```
+
+So a normal `https://suno.com/song/<uuid>` link or bare UUID no longer needs a Suno login/session just to play the track. The existing Tasia Suno Connector / authenticated resolver is still retained for short share links such as `https://suno.com/s/...` where the UUID is not directly visible, and for legacy/compatibility cases.
 
 ## What's new in v2
 
-- **Suno via refreshable browser session/API.** Paste a `suno.com/song/<uuid>` URL, short share link or bare UUID. The bundled Tasia Suno Connector passes your own Clerk `__client` session + device ID after explicit pairing; Docker refreshes JWTs itself, resolves the clip through Suno's feed API, takes the returned `audio_url`, and caches it privately before playout.
+- **Public Suno UUID/song playback without login.** Paste a `suno.com/song/<uuid>` URL or bare UUID and Tasia first requests `http://tasia.fresh-projects.top/sunoapi/<uuid>`, accepts the returned M4A, validates/transcodes it with FFmpeg, and caches it privately before playout. Public Suno CloudFront M4A and CDN MP3 remain automatic fallbacks. Short `/s/...` share links can still use the older connector/authenticated resolver when needed.
 - **SAM-style one-screen layout:** Library/Sources | On-Air + Queue | Playlist + Suno.
 - **Real folder browser:** local folders and subfolders appear directly in the song chooser. Open a folder like a file manager, or add the whole folder tree to Queue/Playlist in one click.
 - **Fast global search:** search the current user's full private library by title, artist or path without leaving the live workstation.
@@ -106,7 +118,36 @@ Browser uploads go to that user's private `Uploads/` folder under `./music/users
 
 ## Suno
 
-Recommended setup:
+### Normal public song URLs / UUIDs
+
+These inputs use the new public playback path and do **not** require a Suno account/session:
+
+```text
+https://suno.com/song/453a796e-a8e2-4d28-b24f-40f956cb5321
+453a796e-a8e2-4d28-b24f-40f956cb5321
+```
+
+Tasia extracts the UUID and tries these playable candidates in order:
+
+```text
+http://tasia.fresh-projects.top/sunoapi/<UUID>
+https://d2lwuy8qc234o3.cloudfront.net/1/clip/<UUID>.m4a
+https://cdn1.suno.ai/<UUID>.mp3
+```
+
+The preferred Tasia endpoint returns `.m4a`. `cache_remote_audio()` downloads the first usable candidate into the current user's private cache, FFmpeg verifies it contains playable audio and converts it to the streamer's normal cached MP3 format. Liquidsoap therefore receives a local validated file and does not need any special M4A handling.
+
+### Short share links / compatibility fallback
+
+A short Suno URL such as:
+
+```text
+https://suno.com/s/SHORT_SHARE_ID
+```
+
+does not expose the clip UUID directly. For those links Tasia keeps the older authenticated resolver as a compatibility fallback.
+
+Recommended setup only if you need short-share/legacy resolution:
 
 1. Open **Settings → Suno connection** and generate a connector key.
 2. Download/install the bundled **Tasia Suno Connector v1.1** in Chrome/Chromium.
@@ -115,19 +156,9 @@ Recommended setup:
 
 The extension reads only Suno's Clerk `__client` session value and device ID after pairing. It does **not** capture request Bearer headers or forward your whole browser cookie jar. Tasia stores the session server-side, exchanges it with Clerk for a JWT, and refreshes the JWT automatically when it is stale.
 
-Accepted track inputs include:
+If the authenticated Suno resolver returns `401` or an auth-stale response, Tasia refreshes the JWT from the saved Clerk session and retries the API request once. A **Refresh now** button is also available in Settings.
 
-```text
-https://suno.com/song/453a796e-a8e2-4d28-b24f-40f956cb5321
-https://suno.com/s/SHORT_SHARE_ID
-453a796e-a8e2-4d28-b24f-40f956cb5321
-```
-
-For a UUID/song link Tasia asks Suno's authenticated `/api/feed/?ids=<uuid>` endpoint for the clip and uses the API-returned `audio_url`. The audio is cached locally before Liquidsoap sees it. Tasia does not construct `cdn1.suno.ai/<uuid>.mp3` from the UUID.
-
-If Suno returns `401` or an auth-stale response, Tasia refreshes the JWT from the saved Clerk session and retries the API request once. A **Refresh now** button is also available in Settings.
-
-For a headless/manual setup you can paste only your own `__client` value (or a Cookie header containing `__client=...`) in Settings. Treat it like a password. Legacy raw-Bearer and signed-cookie support remains only for compatibility with older beta installs.
+For a headless/manual legacy setup you can paste only your own `__client` value (or a Cookie header containing `__client=...`) in Settings. Treat it like a password. Legacy raw-Bearer and signed-cookie support remains only for compatibility with older beta installs.
 
 ## DJ AI adviser
 
@@ -208,7 +239,7 @@ docker compose down
 
 - Liquidsoap telnet and metadata ports are bound inside the container only and are not published by Docker Compose.
 - Each user engine gets its own internal control/metadata ports.
-- Direct HTTP/Suno and WebDAV/FTP/Jellyfin audio is cached/validated before playout. Online catalog tracks keep provider IDs and resolve their stream URL only when due.
+- Direct HTTP/Suno and WebDAV/FTP/Jellyfin audio is cached/validated before playout. Public Suno UUID/song playback prefers Tasia's standalone M4A downloader, then falls back to Suno's public media URLs.
 - `ALLOW_PRIVATE_URLS=false` applies to direct HTTP/Suno and Stremio addon/stream URLs. WebDAV/FTP/Jellyfin sources are explicit authenticated user configuration and may point to a LAN/NAS.
 
 ## Private user music folders
