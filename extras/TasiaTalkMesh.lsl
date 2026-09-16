@@ -1,22 +1,23 @@
 // ============================================================
-// Tasia Talk Mesh
-// Talks to Tasia Streamer -> Tasia AI -> Edge TTS
+// Tasia Talk Mesh -> Tasia Streamer radio
+//
+// What happens:
+//   SL/OpenSim chat or a nearby visitor
+//        -> this LSL script
+//        -> Tasia Streamer AI
+//        -> Edge TTS voice is queued ON THE RADIO STREAM
+//        -> the exact same AI text is returned here and spoken in local chat
 //
 // Setup:
-// 1. Put your Tasia Streamer public URL in API_BASE (no trailing slash).
-// 2. Copy the Mesh API key from Settings -> Tasia Talk into API_KEY.
-// 3. Put this script in Tasia's mesh body/object.
-// 4. Pick a face that can use Shared Media for MEDIA_FACE.
+// 1. Put your public Tasia Streamer URL in API_BASE (no trailing slash).
+// 2. Copy Settings -> Tasia Talk -> Mesh API key into API_KEY.
+// 3. Put the script into Tasia's mesh/body object.
 //
-// Chat example:
-//   @tasia hello there
+// Chat:
+//   @tasia hello!
 //
-// The script posts the request asynchronously, polls for completion,
-// says the returned text in local chat, and loads the generated TTS
-// player page on the configured media face.
-//
-// The API key is sent in JSON request bodies, not in URL query strings,
-// so it does not get copied into ordinary HTTP access-log URLs.
+// Visitors are greeted automatically once per GREET_COOLDOWN_SECONDS.
+// The API key is always sent in JSON bodies, not URL query strings.
 // ============================================================
 
 string API_BASE = "https://YOUR-TASIA-STREAMER";
@@ -24,20 +25,27 @@ string API_KEY  = "PASTE-MESH-API-KEY-HERE";
 
 integer LISTEN_CHANNEL = 0;
 string TRIGGER = "@tasia";
-integer OWNER_ONLY = TRUE;
+integer ALLOW_ANYONE_CHAT = TRUE;
 
-// Shared-media face used only as the audio player.
-integer MEDIA_LINK = LINK_THIS;
-integer MEDIA_FACE = 0;
+integer AUTO_GREET = TRUE;
+float SENSOR_RANGE = 18.0;
+float SENSOR_INTERVAL = 8.0;
+integer GREET_COOLDOWN_SECONDS = 3600;
+integer MAX_REMEMBERED_VISITORS = 40;
 
 float POLL_SECONDS = 2.0;
-integer MAX_POLLS = 45;
+integer MAX_POLLS = 50;
+integer MAX_PENDING_PROMPTS = 6;
 
 integer gListen;
 key gStartRequest = NULL_KEY;
 key gPollRequest = NULL_KEY;
 string gJob = "";
 integer gPollCount = 0;
+list gPendingPrompts = [];
+
+// Pairs: avatar key, last greeting Unix time.
+list gVisitorHistory = [];
 
 string endpoint(string path)
 {
@@ -46,11 +54,14 @@ string endpoint(string path)
 
 integer ready()
 {
-    if (llSubStringIndex(API_BASE, "YOUR-TASIA-STREAMER") != -1)
-        return FALSE;
-    if (llSubStringIndex(API_KEY, "PASTE-MESH-API-KEY") != -1)
-        return FALSE;
+    if (llSubStringIndex(API_BASE, "YOUR-TASIA-STREAMER") != -1) return FALSE;
+    if (llSubStringIndex(API_KEY, "PASTE-MESH-API-KEY") != -1) return FALSE;
     return TRUE;
+}
+
+integer busy()
+{
+    return (gStartRequest != NULL_KEY || gJob != "");
 }
 
 sayError(string message)
@@ -66,24 +77,43 @@ stopPolling()
     llSetTimerEvent(0.0);
 }
 
-playRemoteVoice(string mediaUrl)
+rememberVisitor(key id)
 {
-    if (mediaUrl == "") return;
+    integer now = llGetUnixTime();
+    integer i;
+    integer n = llGetListLength(gVisitorHistory);
 
-    llSetLinkMedia(
-        MEDIA_LINK,
-        MEDIA_FACE,
-        [
-            PRIM_MEDIA_CURRENT_URL, mediaUrl,
-            PRIM_MEDIA_HOME_URL, mediaUrl,
-            PRIM_MEDIA_AUTO_PLAY, TRUE,
-            PRIM_MEDIA_FIRST_CLICK_INTERACT, FALSE,
-            PRIM_MEDIA_PERMS_INTERACT, PRIM_MEDIA_PERM_OWNER,
-            PRIM_MEDIA_PERMS_CONTROL, PRIM_MEDIA_PERM_OWNER,
-            PRIM_MEDIA_WIDTH_PIXELS, 128,
-            PRIM_MEDIA_HEIGHT_PIXELS, 64
-        ]
-    );
+    for (i = 0; i < n; i += 2)
+    {
+        if ((key)llList2String(gVisitorHistory, i) == id)
+        {
+            gVisitorHistory = llListReplaceList(gVisitorHistory, [id, now], i, i + 1);
+            return;
+        }
+    }
+
+    gVisitorHistory += [id, now];
+
+    while (llGetListLength(gVisitorHistory) > MAX_REMEMBERED_VISITORS * 2)
+        gVisitorHistory = llDeleteSubList(gVisitorHistory, 0, 1);
+}
+
+integer greetedRecently(key id)
+{
+    integer now = llGetUnixTime();
+    integer i;
+    integer n = llGetListLength(gVisitorHistory);
+
+    for (i = 0; i < n; i += 2)
+    {
+        if ((key)llList2String(gVisitorHistory, i) == id)
+        {
+            integer last = llList2Integer(gVisitorHistory, i + 1);
+            if ((now - last) < GREET_COOLDOWN_SECONDS) return TRUE;
+            return FALSE;
+        }
+    }
+    return FALSE;
 }
 
 startTalk(string prompt)
@@ -91,12 +121,6 @@ startTalk(string prompt)
     if (!ready())
     {
         sayError("configure API_BASE and API_KEY first.");
-        return;
-    }
-
-    if (gStartRequest != NULL_KEY || gJob != "")
-    {
-        sayError("I am already thinking.");
         return;
     }
 
@@ -113,12 +137,34 @@ startTalk(string prompt)
 
     gStartRequest = llHTTPRequest(
         endpoint("/api/tasia-talk/mesh"),
-        [
-            HTTP_METHOD, "POST",
-            HTTP_MIMETYPE, "application/json"
-        ],
+        [HTTP_METHOD, "POST", HTTP_MIMETYPE, "application/json"],
         body
     );
+}
+
+enqueuePrompt(string prompt)
+{
+    prompt = llStringTrim(prompt, STRING_TRIM);
+    if (prompt == "") return;
+
+    if (!busy())
+    {
+        startTalk(prompt);
+        return;
+    }
+
+    if (llGetListLength(gPendingPrompts) < MAX_PENDING_PROMPTS)
+        gPendingPrompts += [prompt];
+}
+
+startNextPrompt()
+{
+    if (busy()) return;
+    if (llGetListLength(gPendingPrompts) == 0) return;
+
+    string prompt = llList2String(gPendingPrompts, 0);
+    gPendingPrompts = llDeleteSubList(gPendingPrompts, 0, 0);
+    startTalk(prompt);
 }
 
 pollJob()
@@ -128,24 +174,17 @@ pollJob()
     ++gPollCount;
     if (gPollCount > MAX_POLLS)
     {
-        sayError("request timed out.");
+        sayError("AI/TTS request timed out.");
         stopPolling();
+        startNextPrompt();
         return;
     }
 
-    string body = llList2Json(
-        JSON_OBJECT,
-        [
-            "api_key", API_KEY
-        ]
-    );
+    string body = llList2Json(JSON_OBJECT, ["api_key", API_KEY]);
 
     gPollRequest = llHTTPRequest(
         endpoint("/api/tasia-talk/mesh/status/") + gJob,
-        [
-            HTTP_METHOD, "POST",
-            HTTP_MIMETYPE, "application/json"
-        ],
+        [HTTP_METHOD, "POST", HTTP_MIMETYPE, "application/json"],
         body
     );
 }
@@ -156,6 +195,9 @@ default
     {
         if (gListen) llListenRemove(gListen);
         gListen = llListen(LISTEN_CHANNEL, "", NULL_KEY, "");
+
+        if (AUTO_GREET)
+            llSensorRepeat("", NULL_KEY, AGENT, SENSOR_RANGE, PI, SENSOR_INTERVAL);
 
         if (!ready())
             sayError("script loaded. Set API_BASE and API_KEY at the top of the script.");
@@ -168,25 +210,63 @@ default
 
     changed(integer change)
     {
-        if (change & CHANGED_OWNER)
-            llResetScript();
+        if (change & CHANGED_OWNER) llResetScript();
     }
 
     listen(integer channel, string name, key id, string message)
     {
-        if (OWNER_ONLY && id != llGetOwner()) return;
+        if (!ALLOW_ANYONE_CHAT && id != llGetOwner()) return;
 
         string lower = llToLower(message);
         string triggerLower = llToLower(TRIGGER);
         if (llSubStringIndex(lower, triggerLower) != 0) return;
 
         integer triggerLen = llStringLength(TRIGGER);
-        string prompt = llStringTrim(
+        string words = llStringTrim(
             llDeleteSubString(message, 0, triggerLen - 1),
             STRING_TRIM
         );
+        if (words == "") return;
 
-        startTalk(prompt);
+        // Include the speaker name so AI can answer them naturally.
+        enqueuePrompt(name + " said to you in local chat: " + words);
+    }
+
+    sensor(integer count)
+    {
+        if (!AUTO_GREET || !ready()) return;
+
+        list names = [];
+        integer i;
+        for (i = 0; i < count; ++i)
+        {
+            key id = llDetectedKey(i);
+            if (id == NULL_KEY) jump next_avatar;
+
+            // Don't repeatedly greet the same avatar every sensor pass.
+            if (!greetedRecently(id))
+            {
+                string visitor = llDetectedName(i);
+                if (visitor != "") names += [visitor];
+                rememberVisitor(id);
+            }
+@next_avatar;
+        }
+
+        integer newCount = llGetListLength(names);
+        if (newCount > 0)
+        {
+            string joined = llDumpList2String(names, ", ");
+            enqueuePrompt(
+                "These people just arrived near you: " + joined
+                + ". Greet them warmly by name, welcome them to the party and radio stream, and keep it short."
+            );
+        }
+    }
+
+    no_sensor()
+    {
+        // Nothing to do. Visitor history remains so returning avatars are not spammed.
     }
 
     timer()
@@ -203,6 +283,7 @@ default
             if (status < 200 || status >= 300)
             {
                 sayError("start request HTTP " + (string)status + ": " + body);
+                startNextPrompt();
                 return;
             }
 
@@ -211,6 +292,7 @@ default
             if (ok != JSON_TRUE || requestIdText == JSON_INVALID || requestIdText == "")
             {
                 sayError("bad start response: " + body);
+                startNextPrompt();
                 return;
             }
 
@@ -229,6 +311,7 @@ default
             {
                 sayError("poll HTTP " + (string)status + ": " + body);
                 stopPolling();
+                startNextPrompt();
                 return;
             }
 
@@ -237,15 +320,16 @@ default
             if (jobStatus == "done")
             {
                 string text = llJsonGetValue(body, ["text"]);
-                string mediaUrl = llJsonGetValue(body, ["media_url"]);
+                string streamQueued = llJsonGetValue(body, ["stream_queued"]);
 
-                if (text != JSON_INVALID && text != "")
-                    llSay(0, text);
+                // EXACT same AI line as the generated Edge-TTS radio voice.
+                if (text != JSON_INVALID && text != "") llSay(0, text);
 
-                if (mediaUrl != JSON_INVALID && mediaUrl != "")
-                    playRemoteVoice(mediaUrl);
+                if (streamQueued != JSON_TRUE)
+                    sayError("reply text arrived, but radio voice was not queued.");
 
                 stopPolling();
+                startNextPrompt();
                 return;
             }
 
@@ -255,10 +339,11 @@ default
                 if (error == JSON_INVALID || error == "") error = "unknown server error";
                 sayError(error);
                 stopPolling();
+                startNextPrompt();
                 return;
             }
 
-            // queued / working -> wait for the next timer tick.
+            // queued / working: wait for next timer tick.
             return;
         }
     }
