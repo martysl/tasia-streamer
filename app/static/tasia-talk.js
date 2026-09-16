@@ -16,27 +16,28 @@
     const block=document.createElement('div');
     block.id='tasiaTalkBlock';
     block.innerHTML=`
-      <hr><span class="label">TASIA TALK — AI VOICE BETWEEN SONGS + MESH API</span>
-      <p class="settings-note">When enabled, Tasia prepares a short AI radio comment and inserts it as a real audio item between songs. Edge TTS uses Tasia's chosen voice: <code>en-US-AnaNeural</code>, rate <code>+20%</code>, pitch <code>+50Hz</code>. The mesh API uses the same Tasia AI and voice.</p>
+      <hr><span class="label">TASIA TALK — RADIO VOICE + SL/OPENSIM CHAT BRIDGE</span>
+      <p class="settings-note">Tasia can make short AI comments between songs. LSL can also send local chat or visitor-arrival events here: Tasia AI creates one reply, Edge TTS queues that reply onto the radio stream, and the exact same text is returned to the LSL object for local chat. Default voice: <code>en-US-AnaNeural</code>, rate <code>+20%</code>, pitch <code>+50Hz</code>.</p>
       <div class="settings-grid">
         <label class="check"><input id="talkEnabled" type="checkbox"> Speak between songs</label>
-        <label class="check"><input id="talkMeshEnabled" type="checkbox"> Enable mesh / LSL API</label>
+        <label class="check"><input id="talkMeshEnabled" type="checkbox"> Enable LSL chat / greeting bridge</label>
         <label>Speak every N tracks<input id="talkEvery" type="number" min="1" max="20" value="1"></label>
         <label>Maximum words<input id="talkMaxWords" type="number" min="8" max="80" value="28"></label>
         <label>Edge TTS voice<input id="talkVoice" value="en-US-AnaNeural"></label>
         <label>Rate<input id="talkRate" value="+20%"></label>
         <label>Pitch<input id="talkPitch" value="+50Hz"></label>
         <label>Volume<input id="talkVolume" value="+0%"></label>
-        <label class="full-span">Tasia spoken persona prompt<textarea id="talkPersona" rows="3" placeholder="Optional — leave blank for Tasia's built-in warm/playful radio + mesh persona"></textarea></label>
-        <label class="full-span">Mesh API key<input id="talkApiKey" readonly></label>
+        <label class="full-span">Tasia spoken persona prompt<textarea id="talkPersona" rows="3" placeholder="Optional — leave blank for Tasia's built-in warm/playful radio + SL persona"></textarea></label>
+        <label class="full-span">LSL bridge API key<input id="talkApiKey" readonly></label>
       </div>
       <div class="button-row">
         <button id="saveTasiaTalk" type="button" class="ghost">Save Tasia Talk</button>
         <button id="testTasiaTalk" type="button" class="ghost">▶ Test voice + AI</button>
-        <button id="rotateTasiaTalkKey" type="button" class="ghost">Rotate mesh key</button>
-        <button id="copyTasiaTalkMesh" type="button" class="ghost">Copy mesh config</button>
+        <button id="rotateTasiaTalkKey" type="button" class="ghost">Rotate LSL key</button>
+        <button id="copyTasiaTalkMesh" type="button" class="ghost">Copy LSL config</button>
         <a id="downloadTasiaTalkLsl" class="button ghost" href="/api/tasia-talk/lsl" download="TasiaTalkMesh.lsl">Download LSL</a>
       </div>
+      <div class="hint">LSL-triggered speech never interrupts the song currently on air. It is inserted at the next safe scheduler transition; if an automatic Tasia comment was waiting, the live LSL reply takes priority.</div>
       <div id="tasiaTalkMsg" class="msg"></div>
       <audio id="tasiaTalkPreview" class="hidden" controls></audio>
     `;
@@ -89,7 +90,7 @@
         persona_prompt:byId('talkPersona').value.trim()
       }));
       byId('talkApiKey').value=s.api_key||'';
-      msg(`Saved. Between-song talk ${s.enabled?'enabled':'disabled'}; mesh API ${s.mesh_enabled?'enabled':'disabled'}.`,true,false);
+      msg(`Saved. Between-song talk ${s.enabled?'enabled':'disabled'}; LSL bridge ${s.mesh_enabled?'enabled':'disabled'}.`,true,false);
     }catch(err){msg(err.message,false,true)}
   }
 
@@ -106,8 +107,8 @@
 
   async function rotateKey(e){
     e?.preventDefault();
-    if(!confirm('Rotate the Tasia Talk mesh API key? Existing LSL scripts will need the new key.'))return;
-    try{const r=await apiCall('/api/tasia-talk/key/rotate',{method:'POST'});byId('talkApiKey').value=r.api_key||'';msg('Mesh API key rotated. Update the LSL script.',true,false)}
+    if(!confirm('Rotate the Tasia Talk LSL API key? Existing LSL scripts will need the new key.'))return;
+    try{const r=await apiCall('/api/tasia-talk/key/rotate',{method:'POST'});byId('talkApiKey').value=r.api_key||'';msg('LSL API key rotated. Update TasiaTalkMesh.lsl.',true,false)}
     catch(err){msg(err.message,false,true)}
   }
 
@@ -115,7 +116,7 @@
     e?.preventDefault();
     const key=byId('talkApiKey').value.trim();
     const text=`API_BASE = ${location.origin}\nAPI_KEY = ${key}`;
-    try{await navigator.clipboard.writeText(text);msg('Mesh API URL + key copied. Paste them into TasiaTalkMesh.lsl.',true,false)}
+    try{await navigator.clipboard.writeText(text);msg('Streamer URL + LSL API key copied. Paste them into TasiaTalkMesh.lsl.',true,false)}
     catch{prompt('Copy into TasiaTalkMesh.lsl:',text)}
   }
 
