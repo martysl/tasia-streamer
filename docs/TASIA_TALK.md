@@ -1,10 +1,10 @@
 # Tasia Talk
 
-Tasia Talk adds optional AI voice links between songs and exposes the same Tasia AI + Edge TTS voice to a Second Life/OpenSim mesh body.
+Tasia Talk adds optional AI voice links between songs and connects a Second Life/OpenSim Tasia mesh body to the same AI + Edge TTS voice used by the radio.
 
 ## Voice
 
-The default voice is the Tasia voice already used by the project:
+The default Tasia voice is:
 
 ```text
 Voice: en-US-AnaNeural
@@ -27,7 +27,47 @@ Enable **Speak between songs** in Settings. Tasia Streamer then:
 
 The generated speech is stored under the current user's private `/data/users/<id>/tts/` directory and old files are cleaned automatically.
 
-The scheduler allows a longer prefetch window for Tasia AI. If AI/TTS generation still takes too long, that one comment is skipped rather than stopping the music.
+If AI/TTS generation is too slow for the prefetch window, that one automatic comment is skipped rather than stopping the music.
+
+## LSL -> radio bridge
+
+The LSL bridge does **not** play remote audio on the mesh object. Instead:
+
+```text
+SL/OpenSim chat or visitor arrival
+        -> LSL
+        -> Tasia Streamer
+        -> Tasia AI creates one reply
+        -> Edge TTS generates the same reply
+        -> voice is queued into the radio stream
+        -> exact text is returned to LSL
+        -> Tasia writes it in local chat
+```
+
+LSL-triggered speech is treated as live Tasia speech and takes priority over an automatically prepared between-song comment. It never interrupts the song currently on air; it is inserted at the next safe scheduler transition. Liquidsoap may already have one normal item ON DECK, so a live reply can occasionally follow that already-prefetched item.
+
+## Automatic greetings
+
+`extras/TasiaTalkMesh.lsl` includes a nearby-avatar sensor. By default it:
+
+- scans within 18 metres every 8 seconds;
+- remembers visitors for one hour;
+- sends newly detected avatar names to Tasia AI;
+- asks Tasia to greet them by name and welcome them to the party/radio;
+- writes the resulting Tasia line in local chat;
+- queues the matching Edge-TTS voice on the radio stream.
+
+The sensor distance, interval and greeting cooldown are configurable at the top of the LSL script.
+
+## Chat
+
+The default local-chat trigger is:
+
+```text
+@tasia hello
+```
+
+The script includes the speaker's avatar name in the AI request so Tasia can answer them naturally. `ALLOW_ANYONE_CHAT` can be changed in the LSL configuration.
 
 ## DJ AI requirement
 
@@ -39,11 +79,11 @@ Model
 API key (when required)
 ```
 
-The normal DJ adviser and Tasia Talk share the connection, but Tasia Talk uses its own spoken-radio/mesh prompt. An optional Tasia Talk persona prompt can override the built-in spoken persona.
+The normal DJ adviser and Tasia Talk share the connection, but Tasia Talk uses its own spoken-radio/SL prompt. An optional Tasia Talk persona prompt can override the built-in spoken persona.
 
-## Mesh / LSL API
+## LSL API
 
-Each Tasia Streamer account receives its own rotatable Mesh API key. It is shown only to the logged-in account in **Settings -> Tasia Talk**.
+Each Tasia Streamer account receives its own rotatable LSL API key. It is shown only to the logged-in account in **Settings -> Tasia Talk**.
 
 Start a request:
 
@@ -52,8 +92,8 @@ POST /api/tasia-talk/mesh
 Content-Type: application/json
 
 {
-  "api_key": "YOUR_MESH_KEY",
-  "prompt": "Hello Tasia"
+  "api_key": "YOUR_LSL_KEY",
+  "prompt": "Marty said to you in local chat: hello"
 }
 ```
 
@@ -67,14 +107,14 @@ Immediate response:
 }
 ```
 
-Poll without keeping one long HTTP request open. The preferred polling route is also POST so the API key stays in the JSON body instead of appearing in access-log URLs:
+Poll without keeping one long HTTP request open. The API key stays in the JSON body instead of appearing in the URL:
 
 ```http
 POST /api/tasia-talk/mesh/status/<request_id>
 Content-Type: application/json
 
 {
-  "api_key": "YOUR_MESH_KEY"
+  "api_key": "YOUR_LSL_KEY"
 }
 ```
 
@@ -93,16 +133,15 @@ When ready:
 {
   "ok": true,
   "status": "done",
-  "text": "Tasia's reply",
-  "duration": 4.2,
-  "audio_url": "https://streamer.example/api/tasia-talk/audio/...",
-  "media_url": "https://streamer.example/api/tasia-talk/media/..."
+  "text": "Hey Marty, welcome back!",
+  "duration": 3.7,
+  "stream_queued": true
 }
 ```
 
-Generated public audio/media tokens expire automatically.
+The `text` field is exactly the spoken AI line used to generate the Edge-TTS radio audio.
 
-## LSL
+## LSL setup
 
 The ready-to-edit script is:
 
@@ -112,31 +151,24 @@ extras/TasiaTalkMesh.lsl
 
 It can also be downloaded from the Tasia Talk block in Settings.
 
-At the top of the script set:
+Set:
 
 ```lsl
 string API_BASE = "https://YOUR-TASIA-STREAMER";
-string API_KEY  = "YOUR-MESH-API-KEY";
+string API_KEY  = "YOUR-LSL-API-KEY";
 ```
 
-Then choose a face on the Tasia mesh object for Shared Media:
+Useful options:
 
 ```lsl
-integer MEDIA_LINK = LINK_THIS;
-integer MEDIA_FACE = 0;
+integer ALLOW_ANYONE_CHAT = TRUE;
+integer AUTO_GREET = TRUE;
+float SENSOR_RANGE = 18.0;
+float SENSOR_INTERVAL = 8.0;
+integer GREET_COOLDOWN_SECONDS = 3600;
 ```
 
-The default chat trigger is:
-
-```text
-@tasia hello
-```
-
-The script sends the prompt asynchronously, polls with the API key in the POST body until the AI/TTS job finishes, says the returned text in local chat, then loads the generated TTS player on the configured Shared Media face.
-
-### Shared Media note
-
-Second Life/OpenSim LSL cannot pass an arbitrary remote MP3 URL to `llPlaySound`; that function expects an in-world sound asset. Therefore the supplied script uses Shared Media on one mesh face for the generated remote TTS audio. Viewer media/autoplay permissions must allow that face to play media.
+No Shared Media face is required for Tasia Talk. The generated voice is played by Tasia Streamer on the radio output, not by the SL/OpenSim object.
 
 ## Browser/API routes
 
@@ -147,9 +179,7 @@ POST /api/tasia-talk/test
 POST /api/tasia-talk/key/rotate
 POST /api/tasia-talk/mesh
 POST /api/tasia-talk/mesh/status/<request_id>
-GET  /api/tasia-talk/audio/<token>
-GET  /api/tasia-talk/media/<token>
 GET  /api/tasia-talk/lsl
 ```
 
-The settings/test/key/LSL download routes require a normal logged-in Tasia Streamer session. The external mesh routes use the per-user Mesh API key.
+The settings/test/key/LSL download routes require a normal logged-in Tasia Streamer session. The external LSL routes use the per-user LSL API key.
