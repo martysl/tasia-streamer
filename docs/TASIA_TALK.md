@@ -27,7 +27,7 @@ Enable **Speak between songs** in Settings. Tasia Streamer then:
 
 The generated speech is stored under the current user's private `/data/users/<id>/tts/` directory and old files are cleaned automatically.
 
-If AI/TTS generation is too slow for Liquidsoap's next-track prefetch, that one comment is skipped rather than stopping the music.
+The scheduler allows a longer prefetch window for Tasia AI. If AI/TTS generation still takes too long, that one comment is skipped rather than stopping the music.
 
 ## DJ AI requirement
 
@@ -67,10 +67,15 @@ Immediate response:
 }
 ```
 
-Poll without keeping one long HTTP request open:
+Poll without keeping one long HTTP request open. The preferred polling route is also POST so the API key stays in the JSON body instead of appearing in access-log URLs:
 
-```text
-GET /api/tasia-talk/mesh/status/<request_id>?apikey=<YOUR_MESH_KEY>
+```http
+POST /api/tasia-talk/mesh/status/<request_id>
+Content-Type: application/json
+
+{
+  "api_key": "YOUR_MESH_KEY"
+}
 ```
 
 While processing:
@@ -127,7 +132,7 @@ The default chat trigger is:
 @tasia hello
 ```
 
-The script sends the prompt asynchronously, polls until the AI/TTS job finishes, says the returned text in local chat, then loads the generated TTS player on the configured Shared Media face.
+The script sends the prompt asynchronously, polls with the API key in the POST body until the AI/TTS job finishes, says the returned text in local chat, then loads the generated TTS player on the configured Shared Media face.
 
 ### Shared Media note
 
@@ -141,7 +146,7 @@ PUT  /api/settings/tasia-talk
 POST /api/tasia-talk/test
 POST /api/tasia-talk/key/rotate
 POST /api/tasia-talk/mesh
-GET  /api/tasia-talk/mesh/status/<request_id>
+POST /api/tasia-talk/mesh/status/<request_id>
 GET  /api/tasia-talk/audio/<token>
 GET  /api/tasia-talk/media/<token>
 GET  /api/tasia-talk/lsl
