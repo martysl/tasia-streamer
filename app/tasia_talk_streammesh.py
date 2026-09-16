@@ -12,6 +12,11 @@ _installed = False
 
 
 def enqueue_stream_voice(user_id: int, path: Path, text: str, duration: float | None) -> None:
+    # A live SL/OpenSim interaction is more important than an automatically
+    # prepared between-song comment. Drop the pending automatic link so Tasia
+    # does not speak twice back-to-back after greeting/responding to somebody.
+    tasia_talk.clear_pending(int(user_id))
+
     track = {
         "title": "Tasia Live",
         "artist": "Tasia",
