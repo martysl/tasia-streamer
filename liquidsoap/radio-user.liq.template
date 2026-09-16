@@ -53,7 +53,7 @@ output.shoutcast(
   port=__PORT__,
   password="__PASSWORD__",
   icy_id=__SID__,
-  name="__NAME__,",
+  name="__NAME__",
   genre="__GENRE__",
   url="__URL__",
   public=__PUBLIC__,
