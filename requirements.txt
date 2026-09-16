@@ -5,6 +5,7 @@ requests>=2.32.3,<3
 redis>=5,<7
 python-multipart==0.0.20
 mutagen==1.47.0
+edge-tts>=7.2.0
 
 yt-dlp[default]==2026.7.4
 spotipyFree>=1.9.13,<2
