@@ -14,6 +14,9 @@
 // The script posts the request asynchronously, polls for completion,
 // says the returned text in local chat, and loads the generated TTS
 // player page on the configured media face.
+//
+// The API key is sent in JSON request bodies, not in URL query strings,
+// so it does not get copied into ordinary HTTP access-log URLs.
 // ============================================================
 
 string API_BASE = "https://YOUR-TASIA-STREAMER";
@@ -130,15 +133,20 @@ pollJob()
         return;
     }
 
-    string url = endpoint("/api/tasia-talk/mesh/status/")
-        + gJob
-        + "?apikey="
-        + llEscapeURL(API_KEY);
+    string body = llList2Json(
+        JSON_OBJECT,
+        [
+            "api_key", API_KEY
+        ]
+    );
 
     gPollRequest = llHTTPRequest(
-        url,
-        [HTTP_METHOD, "GET"],
-        ""
+        endpoint("/api/tasia-talk/mesh/status/") + gJob,
+        [
+            HTTP_METHOD, "POST",
+            HTTP_MIMETYPE, "application/json"
+        ],
+        body
     );
 }
 
