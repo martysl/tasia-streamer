@@ -85,7 +85,7 @@ button:disabled{opacity:.45;cursor:not-allowed;filter:none}.library-search{displ
 
 
 /* Tasia Talk quick transport toggle */
-.tasia-talk-quick{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:#211a29;color:var(--text);font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer;user-select:none}
+.tasia-talk-quick{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:50px;min-height:32px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:#211a29;color:var(--text);font-size:10px;font-weight:900;white-space:nowrap;cursor:pointer;user-select:none;flex:0 0 auto}
 .tasia-talk-quick:hover{border-color:var(--line2);filter:brightness(1.08)}
-.tasia-talk-quick input{width:auto;margin:0;accent-color:var(--pink);cursor:pointer}
+.tasia-talk-quick input{width:13px;height:13px;margin:0;accent-color:var(--pink);cursor:pointer}
 .tasia-talk-quick input:disabled{cursor:wait;opacity:.55}
