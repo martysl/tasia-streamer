@@ -1,5 +1,6 @@
 from .spotify_free_fix import install as _install_spotify_free_fix
 from .suno_public_fix import install as _install_suno_public_fix
+from .pawan_waf_fix import install as _install_pawan_waf_fix
 from . import tasia_talk as _tasia_talk
 from .tasia_talk import install as _install_tasia_talk
 from .tasia_talk_streammesh import install as _install_tasia_streammesh
@@ -7,6 +8,7 @@ from . import tasia_talk_secure as _tasia_talk_secure  # registers secure POST p
 
 _install_spotify_free_fix()
 _install_suno_public_fix()
+_install_pawan_waf_fix()
 _install_tasia_talk()
 _install_tasia_streammesh()
 
