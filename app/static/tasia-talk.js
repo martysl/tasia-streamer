@@ -31,8 +31,8 @@
       const wrap=document.createElement('label');
       wrap.id='tasiaTalkQuickWrap';
       wrap.className='tasia-talk-quick';
-      wrap.title='Automatic Tasia between-song comments';
-      wrap.innerHTML='<input id="tasiaTalkQuickToggle" type="checkbox" disabled><span>AI</span>';
+      wrap.title='Tasia Talk on/off';
+      wrap.innerHTML='<input id="tasiaTalkQuickToggle" type="checkbox" disabled aria-label="Tasia Talk on/off">';
       skip.insertAdjacentElement('afterend',wrap);
       quick=byId('tasiaTalkQuickToggle');
     }
