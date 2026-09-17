@@ -9,6 +9,71 @@
   });
   const json = (method, body) => ({method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
 
+  function quickPayload(settings, enabled){
+    return {
+      enabled:!!enabled,
+      mesh_enabled:settings.mesh_enabled!==false,
+      every_n_tracks:Number(settings.every_n_tracks||1),
+      max_words:Number(settings.max_words||28),
+      voice:String(settings.voice||'en-US-AnaNeural'),
+      rate:String(settings.rate||'+20%'),
+      pitch:String(settings.pitch||'+50Hz'),
+      volume:String(settings.volume||'+0%'),
+      persona_prompt:String(settings.persona_prompt||'')
+    };
+  }
+
+  function injectQuickToggle(){
+    if(byId('tasiaTalkQuickToggle')) return;
+    const skip=byId('skip');
+    if(!skip) return;
+    const wrap=document.createElement('label');
+    wrap.id='tasiaTalkQuickWrap';
+    wrap.className='tasia-talk-quick';
+    wrap.title='Turn automatic Tasia between-song comments on or off';
+    wrap.innerHTML='<input id="tasiaTalkQuickToggle" type="checkbox" disabled><span>Tasia Talk</span>';
+    skip.insertAdjacentElement('afterend',wrap);
+    byId('tasiaTalkQuickToggle').addEventListener('change',quickToggleChanged);
+  }
+
+  function syncQuickToggle(settings){
+    const quick=byId('tasiaTalkQuickToggle');
+    if(quick){
+      quick.checked=!!settings.enabled;
+      quick.disabled=false;
+    }
+    const full=byId('talkEnabled');
+    if(full) full.checked=!!settings.enabled;
+  }
+
+  async function refreshQuickToggle(){
+    injectQuickToggle();
+    const quick=byId('tasiaTalkQuickToggle');
+    if(!quick) return;
+    try{
+      const settings=await apiCall('/api/settings/tasia-talk');
+      syncQuickToggle(settings);
+    }catch(_){
+      quick.disabled=true;
+    }
+  }
+
+  async function quickToggleChanged(e){
+    const quick=e.currentTarget;
+    const wanted=!!quick.checked;
+    quick.disabled=true;
+    try{
+      const current=await apiCall('/api/settings/tasia-talk');
+      const saved=await apiCall('/api/settings/tasia-talk',json('PUT',quickPayload(current,wanted)));
+      syncQuickToggle(saved);
+    }catch(err){
+      quick.checked=!wanted;
+      alert('Tasia Talk toggle failed: '+err.message);
+    }finally{
+      quick.disabled=false;
+    }
+  }
+
   function injectPanel(){
     if(byId('tasiaTalkBlock')) return;
     const aiMsg=byId('aiSettingsMsg');
@@ -58,7 +123,7 @@
     injectPanel();
     try{
       const s=await apiCall('/api/settings/tasia-talk');
-      byId('talkEnabled').checked=!!s.enabled;
+      syncQuickToggle(s);
       byId('talkMeshEnabled').checked=s.mesh_enabled!==false;
       byId('talkEvery').value=s.every_n_tracks||1;
       byId('talkMaxWords').value=s.max_words||28;
@@ -90,6 +155,7 @@
         persona_prompt:byId('talkPersona').value.trim()
       }));
       byId('talkApiKey').value=s.api_key||'';
+      syncQuickToggle(s);
       msg(`Saved. Between-song talk ${s.enabled?'enabled':'disabled'}; LSL bridge ${s.mesh_enabled?'enabled':'disabled'}.`,true,false);
     }catch(err){msg(err.message,false,true)}
   }
@@ -121,6 +187,23 @@
   }
 
   injectPanel();
+  injectQuickToggle();
+
+  // app.js may still be finishing login/session restoration when this helper
+  // loads. As soon as the workstation is visible, mirror the persisted radio
+  // talk state into the transport-bar checkbox next to Skip.
+  let quickSyncTries=0;
+  const quickSyncTimer=setInterval(()=>{
+    quickSyncTries+=1;
+    const shell=byId('appShell');
+    if(shell && !shell.classList.contains('hidden')){
+      clearInterval(quickSyncTimer);
+      refreshQuickToggle();
+    }else if(quickSyncTries>=60){
+      clearInterval(quickSyncTimer);
+    }
+  },500);
+
   const settingsButton=byId('settingsBtn');
   if(settingsButton){
     const original=settingsButton.onclick;
