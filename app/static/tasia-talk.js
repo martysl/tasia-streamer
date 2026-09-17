@@ -24,16 +24,22 @@
   }
 
   function injectQuickToggle(){
-    if(byId('tasiaTalkQuickToggle')) return;
-    const skip=byId('skip');
-    if(!skip) return;
-    const wrap=document.createElement('label');
-    wrap.id='tasiaTalkQuickWrap';
-    wrap.className='tasia-talk-quick';
-    wrap.title='Turn automatic Tasia between-song comments on or off';
-    wrap.innerHTML='<input id="tasiaTalkQuickToggle" type="checkbox" disabled><span>Tasia Talk</span>';
-    skip.insertAdjacentElement('afterend',wrap);
-    byId('tasiaTalkQuickToggle').addEventListener('change',quickToggleChanged);
+    let quick=byId('tasiaTalkQuickToggle');
+    if(!quick){
+      const skip=byId('skip');
+      if(!skip) return;
+      const wrap=document.createElement('label');
+      wrap.id='tasiaTalkQuickWrap';
+      wrap.className='tasia-talk-quick';
+      wrap.title='Automatic Tasia between-song comments';
+      wrap.innerHTML='<input id="tasiaTalkQuickToggle" type="checkbox" disabled><span>AI</span>';
+      skip.insertAdjacentElement('afterend',wrap);
+      quick=byId('tasiaTalkQuickToggle');
+    }
+    if(quick && quick.dataset.tasiaBound!=='1'){
+      quick.dataset.tasiaBound='1';
+      quick.addEventListener('change',quickToggleChanged);
+    }
   }
 
   function syncQuickToggle(settings){
