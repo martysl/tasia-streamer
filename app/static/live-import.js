@@ -122,13 +122,16 @@
           report.push({line: entry.line, input: entry.value, status: 'failed', detail: e.message || String(e)});
         }
 
-        // The server commits each item before returning this single-song request.
-        // Refresh now so Playlist/Queue visibly grows while the remaining lines
-        // are still being resolved.
-        try {
-          await refreshImportTarget(target);
-        } catch (_) {
-          // Progress rendering must not turn a successful import into a failure.
+        // The server commits each item before returning. Refreshing the entire
+        // workstation after every single line was surprisingly expensive, so
+        // repaint in small groups while keeping visible live progress.
+        const shouldRefresh = ((index + 1) % 3 === 0) || index === entries.length - 1;
+        if (shouldRefresh) {
+          try {
+            await refreshImportTarget(target);
+          } catch (_) {
+            // Progress rendering must not turn a successful import into a failure.
+          }
         }
 
         const current = aggregateResult(target, source, entries, report);
