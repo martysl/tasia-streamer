@@ -7,12 +7,12 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import btch, catalogs, media as media_module
+from . import btch, catalogs, media as media_module, spotiflac_bridge
 from .config import USER_DATA_DIR
 
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 CACHE_MAX_ENTRIES = 500
-_BTCH_SENTINEL = "tasia-btch-spotify:"
+_SPOTIFLAC_SENTINEL = "tasia-spotiflac:"
 
 _client = None
 _client_lock = threading.RLock()
@@ -26,7 +26,7 @@ def _cache_path(settings: dict) -> Path:
     user_id = int(settings.get("user_id") or 0)
     root = USER_DATA_DIR / str(user_id if user_id > 0 else 0) / "cache"
     root.mkdir(parents=True, exist_ok=True)
-    return root / "spotify-search-v1.json"
+    return root / "spotify-search-v2.json"
 
 
 def _cache_key(query: str) -> str:
@@ -38,9 +38,9 @@ def _load_cache(settings: dict) -> dict:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {"version": 1, "entries": {}}
+        return {"version": 2, "entries": {}}
     if not isinstance(payload, dict) or not isinstance(payload.get("entries"), dict):
-        return {"version": 1, "entries": {}}
+        return {"version": 2, "entries": {}}
     return payload
 
 
@@ -49,7 +49,7 @@ def _save_cache(settings: dict, payload: dict) -> None:
     entries = payload.get("entries") if isinstance(payload, dict) else None
     if not isinstance(entries, dict):
         entries = {}
-        payload = {"version": 1, "entries": entries}
+        payload = {"version": 2, "entries": entries}
 
     now = time.time()
     valid = []
@@ -172,7 +172,7 @@ def _spotify_track(row: dict) -> dict:
         "duration": duration,
         "url": url,
         "artwork": artwork,
-        "license": "Spotify public metadata / BTCH resolver",
+        "license": "Spotify public metadata / SpotiFLAC lossless resolver",
         "access": "playable",
     }
 
@@ -199,6 +199,25 @@ def _live_search(query: str, limit: int) -> list[dict]:
             last_error = exc
     raise catalogs.CatalogError(
         f"Spotify public search failed after refreshing the free session: {last_error}"
+    )
+
+
+def _live_track(track_id: str) -> dict:
+    track_id = str(track_id or "").strip()
+    if not track_id:
+        raise catalogs.CatalogError("Missing Spotify track id")
+    last_error = None
+    for attempt in range(2):
+        client = _free_client(reset=attempt > 0)
+        try:
+            row = client.track(track_id)
+            if not isinstance(row, dict):
+                raise ValueError("Spotify returned an invalid track response")
+            return _spotify_track(row)
+        except Exception as exc:
+            last_error = exc
+    raise catalogs.CatalogError(
+        f"Spotify public track lookup failed after refreshing the free session: {last_error}"
     )
 
 
@@ -238,7 +257,9 @@ def install() -> None:
         raw = str(query or "").strip()
         parsed = urlparse(raw)
         if parsed.scheme in {"http", "https"} and parsed.netloc:
-            rows = [btch.resolve(provider, raw)]
+            track_id = parsed.path.rstrip("/").split("/")[-1].split("?")[0]
+            row = _live_track(track_id)
+            rows = [row]
             _remember_tracks(rows)
             return rows
         return spotify_search(settings, raw, limit)
@@ -250,12 +271,17 @@ def install() -> None:
 
         remembered = _remembered_track(track_id)
         if remembered is None:
-            return original_get_track(provider, settings, track_id)
+            try:
+                url = btch.unpack_url(str(track_id))
+                spotify_id = url.rstrip("/").split("/")[-1].split("?")[0]
+                remembered = _live_track(spotify_id)
+                _remember_tracks([remembered])
+            except Exception as exc:
+                raise catalogs.CatalogError(f"Spotify track lookup failed: {exc}") from exc
 
-        # A search result already contains every field needed to store a playlist
-        # reference. Do not immediately run BTCH a second time just to recover the
-        # same title/artist metadata. Queueing/playback still resolves through BTCH
-        # below, exactly when actual audio is needed.
+        # Keep Spotify metadata as the visible identity. Actual audio is fetched
+        # only when Queue needs it, through SpotiFLAC's non-YouTube lossless
+        # providers.
         url = str(remembered.get("url") or "").strip()
         if not url:
             try:
@@ -264,18 +290,14 @@ def install() -> None:
                 url = ""
         row = dict(remembered)
         if url:
-            row["media_url"] = _BTCH_SENTINEL + url
+            row["media_url"] = _SPOTIFLAC_SENTINEL + url
         return row
 
     def cache_remote_audio(url: str, user_id: int, filename_hint: str | None = None):
         raw = str(url or "")
-        if raw.startswith(_BTCH_SENTINEL):
-            spotify_url = raw[len(_BTCH_SENTINEL):]
-            resolved = btch.resolve("btch-spotify", spotify_url)
-            media_url = str(resolved.get("media_url") or "").strip()
-            if not media_url:
-                raise ValueError("BTCH Spotify resolver returned no playable media URL")
-            return original_cache_remote_audio(media_url, user_id, filename_hint=filename_hint)
+        if raw.startswith(_SPOTIFLAC_SENTINEL):
+            spotify_url = raw[len(_SPOTIFLAC_SENTINEL):]
+            return spotiflac_bridge.cache_spotify_track(spotify_url, user_id)
         return original_cache_remote_audio(url, user_id, filename_hint=filename_hint)
 
     def test(provider: str, settings: dict) -> dict:
@@ -283,14 +305,13 @@ def install() -> None:
         if provider != "btch-spotify":
             return original_test(provider, settings)
 
-        btch_status = btch.runtime_status()
         rows = spotify_search(settings, "Daft Punk One More Time", 1)
+        status = spotiflac_bridge.runtime_status()
         return {
             "ok": True,
             "message": (
                 "Spotify search works through SpotipyFree without Spotify API credentials; "
-                f"{len(rows)} test result. BTCH resolver: "
-                f"{btch_status.get('message') or 'ready'}"
+                f"{len(rows)} test result. {status.get('message') or 'SpotiFLAC ready'}"
             ),
         }
 

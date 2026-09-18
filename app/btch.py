@@ -14,8 +14,8 @@ class BtchError(ValueError):
 
 HELPER = Path('/app/node/btch-helper.mjs')
 PROVIDERS = {
-    'btch-spotify': ('spotify', 'Spotify'),
-    'btch-soundcloud': ('soundcloud', 'SoundCloud'),
+    # Spotify moved to SpotiFLAC and SoundCloud moved to Tioo. Keep BTCH only
+    # for the provider that still uses it.
     'btch-gdrive': ('gdrive', 'Google Drive'),
 }
 

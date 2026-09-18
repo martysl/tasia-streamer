@@ -4,7 +4,7 @@ USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        python3 python3-venv ffmpeg curl ca-certificates gosu unzip gnupg \
-       openssl aria2 g++ git libffi-dev zlib1g-dev build-essential \
+       openssl aria2 g++ git libffi-dev zlib1g-dev build-essential libsndfile1 \
        libc6 libgcc-s1 libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -25,6 +25,7 @@ COPY node/package.json /app/node/package.json
 RUN cd /app/node && npm install --omit=dev
 COPY node/btch-helper.mjs /app/node/btch-helper.mjs
 COPY requirements.txt /app/requirements.txt
+COPY scripts/install_spotiflac_extensions.py /tmp/install_spotiflac_extensions.py
 
 # Match spotDL's Docker runtime/build dependencies and keep the Python setup in
 # separate layers so BuildKit reports the exact failing stage if SpotipyFree's
@@ -33,7 +34,9 @@ RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN /opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt \
     && /opt/venv/bin/pip check
-RUN /opt/venv/bin/python -c "import importlib.metadata as m; print('spotipyFree', m.version('spotipyFree')); print('spotapi', m.version('spotapi')); import requests; from SpotipyFree import Spotify; Spotify(); print('SpotipyFree import OK')"
+RUN /opt/venv/bin/python -c "import importlib.metadata as m; print('spotipyFree', m.version('spotipyFree')); print('spotapi', m.version('spotapi')); print('SpotiFLAC', m.version('SpotiFLAC')); import requests; from SpotipyFree import Spotify; Spotify(); import SpotiFLAC; print('Spotify metadata + SpotiFLAC imports OK')"
+RUN /opt/venv/bin/python /tmp/install_spotiflac_extensions.py \
+    && rm -f /tmp/install_spotiflac_extensions.py
 
 COPY app /app/app
 COPY extras /app/extras

@@ -763,7 +763,7 @@ def _txt_find_catalog(user:dict,value:str,source:str)->dict:
         if provider not in catalogs.PROVIDERS:
             raise ValueError('Unknown import search service')
         if provider in {'btch-soundcloud','btch-gdrive'}:
-            raise ValueError(f'{provider} accepts links; use SoundCloud Search/Auto for song names')
+            raise ValueError('This provider accepts links; use SoundCloud Search/Auto for song names')
         rows=catalogs.search(provider,db.get_catalog_settings(user['id'],provider),value,6)
     if not rows:
         raise ValueError('No matching song found in the selected service(s)')
@@ -1220,7 +1220,7 @@ def _catalog_add(body:CatalogItem,user:dict,target:str,metadata_override:dict|No
         try: path,duration,_=cache_remote_audio(str(track.get('media_url') or ''),user['id'],filename_hint=track.get('title'))
         except Exception as exc: raise HTTPException(400,str(exc))
         track['duration']=duration or track.get('duration')
-        folder={'btch-spotify':'Spotify (BTCH)','btch-soundcloud':'SoundCloud (BTCH)','btch-gdrive':'Google Drive (BTCH)'}.get(provider,'BTCH')
+        folder={'btch-spotify':'Spotify (SpotiFLAC)','btch-soundcloud':'SoundCloud (Tioo)','btch-gdrive':'Google Drive (BTCH)'}.get(provider,'Catalog cache')
         db.upsert_library(user['id'],path,track['title'],track.get('artist') or '',track.get('duration'),path.stat().st_size,
                           folder=folder,source_kind=provider,remote_path=track.get('url') or '')
     else:

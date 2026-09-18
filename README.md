@@ -2,7 +2,7 @@
 
 A compact multi-user SHOUTcast DJ workstation built around FastAPI + SQLite + FFmpeg + Liquidsoap 2.4.5.
 
-Beta29 keeps the multi-source/BTCH work and can use a private keyed Suno downloader for public Suno UUID/song playback, while retaining the older Suno resolver paths as fallbacks.
+Beta29 keeps the multi-source workstation and now uses SpotipyFree + SpotiFLAC for Spotify, Tioo for direct SoundCloud links, BTCH only where still needed (currently Google Drive), plus the existing Suno resolver stack.
 
 ## Multi-source search and song-list import (beta29)
 
@@ -10,9 +10,13 @@ The Online tab now has **All Sources**, which searches Spotify, Universal Search
 
 Import TXT can use a file or a pasted list. Put one song or supported URL on each line. **Find songs in** can be Auto/All or a specific service. Auto checks the private local library for an exact match first, then searches online. Spotify/SoundCloud/Google Drive/YouTube/Suno URLs are detected automatically in mixed lists.
 
-## BTCH URL providers (beta28)
+## Spotify / SoundCloud / URL resolvers
 
-Online / Universal includes Spotify (BTCH), SoundCloud (BTCH), and Google Drive (BTCH). Paste a source URL, resolve it, then use Q / P / Saved like the other catalog providers. Queueing caches and validates a private MP3 copy before Liquidsoap uses it. The Docker image installs `btch-downloader@6.3.6` with Node.js.
+Spotify search uses SpotipyFree without Spotify Developer credentials. Spotify audio no longer uses BTCH: when a Spotify item moves into Queue, Tasia resolves it with SpotiFLAC and the selected lossless providers (Tidal, Qobuz, Amazon Music and Deezer), normalizes the result to FLAC, and stores it in that user's private cache.
+
+SoundCloud direct links use `https://backend1.tioo.eu.org/api/downloader/soundcloud` (configurable with `TIOO_API_BASE`) and prefer the API's direct `audio` URL, falling back to `downloadMp3`.
+
+Google Drive URL resolution still uses BTCH. YouTube was **not** removed: explicit YouTube URLs continue through Tasia's existing Universal/API path. Spotify never silently falls back to YouTube.
 
 ## Suno playback (beta29 maintenance update)
 
