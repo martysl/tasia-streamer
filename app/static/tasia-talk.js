@@ -15,9 +15,9 @@
       mesh_enabled:settings.mesh_enabled!==false,
       every_n_tracks:Number(settings.every_n_tracks||1),
       max_words:Number(settings.max_words||28),
-      voice:String(settings.voice||'en-US-AnaNeural'),
-      rate:String(settings.rate||'+20%'),
-      pitch:String(settings.pitch||'+50Hz'),
+      voice:String(settings.voice||'en-GB-MaisieNeural'),
+      rate:String(settings.rate||'+0%'),
+      pitch:String(settings.pitch||'+0Hz'),
       volume:String(settings.volume||'+0%'),
       persona_prompt:String(settings.persona_prompt||'')
     };
@@ -88,15 +88,15 @@
     block.id='tasiaTalkBlock';
     block.innerHTML=`
       <hr><span class="label">TASIA TALK — RADIO VOICE + SL/OPENSIM CHAT BRIDGE</span>
-      <p class="settings-note">Tasia can make short AI comments between songs. LSL can also send local chat or visitor-arrival events here: Tasia AI creates one reply, Edge TTS queues that reply onto the radio stream, and the exact same text is returned to the LSL object for local chat. Default voice: <code>en-US-AnaNeural</code>, rate <code>+20%</code>, pitch <code>+50Hz</code>.</p>
+      <p class="settings-note">Tasia can make short AI comments between songs. LSL can also send local chat or visitor-arrival events here: Tasia AI creates one reply, Edge TTS queues that reply onto the radio stream, and the exact same text is returned to the LSL object for local chat. Default voice: <code>en-GB-MaisieNeural</code>, rate <code>+0%</code>, pitch <code>+0Hz</code>.</p>
       <div class="settings-grid">
         <label class="check"><input id="talkEnabled" type="checkbox"> Speak between songs</label>
         <label class="check"><input id="talkMeshEnabled" type="checkbox"> Enable LSL chat / greeting bridge</label>
         <label>Speak every N tracks<input id="talkEvery" type="number" min="1" max="20" value="1"></label>
         <label>Maximum words<input id="talkMaxWords" type="number" min="8" max="80" value="28"></label>
-        <label>Edge TTS voice<input id="talkVoice" value="en-US-AnaNeural"></label>
-        <label>Rate<input id="talkRate" value="+20%"></label>
-        <label>Pitch<input id="talkPitch" value="+50Hz"></label>
+        <label>Edge TTS voice<input id="talkVoice" value="en-GB-MaisieNeural"></label>
+        <label>Rate<input id="talkRate" value="+0%"></label>
+        <label>Pitch<input id="talkPitch" value="+0Hz"></label>
         <label>Volume<input id="talkVolume" value="+0%"></label>
         <label class="full-span">Tasia spoken persona prompt<textarea id="talkPersona" rows="3" placeholder="Optional — leave blank for Tasia's built-in warm/playful radio + SL persona"></textarea></label>
         <label class="full-span">LSL bridge API key<input id="talkApiKey" readonly></label>
@@ -133,9 +133,9 @@
       byId('talkMeshEnabled').checked=s.mesh_enabled!==false;
       byId('talkEvery').value=s.every_n_tracks||1;
       byId('talkMaxWords').value=s.max_words||28;
-      byId('talkVoice').value=s.voice||'en-US-AnaNeural';
-      byId('talkRate').value=s.rate||'+20%';
-      byId('talkPitch').value=s.pitch||'+50Hz';
+      byId('talkVoice').value=s.voice||'en-GB-MaisieNeural';
+      byId('talkRate').value=s.rate||'+0%';
+      byId('talkPitch').value=s.pitch||'+0Hz';
       byId('talkVolume').value=s.volume||'+0%';
       byId('talkPersona').value=s.persona_prompt||'';
       byId('talkApiKey').value=s.api_key||'';
@@ -154,9 +154,9 @@
         mesh_enabled:byId('talkMeshEnabled').checked,
         every_n_tracks:Number(byId('talkEvery').value||1),
         max_words:Number(byId('talkMaxWords').value||28),
-        voice:byId('talkVoice').value.trim()||'en-US-AnaNeural',
-        rate:byId('talkRate').value.trim()||'+20%',
-        pitch:byId('talkPitch').value.trim()||'+50Hz',
+        voice:byId('talkVoice').value.trim()||'en-GB-MaisieNeural',
+        rate:byId('talkRate').value.trim()||'+0%',
+        pitch:byId('talkPitch').value.trim()||'+0Hz',
         volume:byId('talkVolume').value.trim()||'+0%',
         persona_prompt:byId('talkPersona').value.trim()
       }));
