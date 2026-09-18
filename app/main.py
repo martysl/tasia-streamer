@@ -55,6 +55,13 @@ class UrlTrack(BaseModel):
 class LibraryTrack(BaseModel): track_id:int
 class Reorder(BaseModel): ordered_ids:list[int]
 class PositionMove(BaseModel): position:int=Field(ge=1)
+class SavedPlaylistCreate(BaseModel):
+    name:str=Field(min_length=1,max_length=120)
+    source:str='playlist'
+    activate:bool=True
+class SavedPlaylistUpdate(BaseModel):
+    name:str|None=Field(default=None,max_length=120)
+    save_current:bool=True
 class StreamSettingsIn(BaseModel):
     host:str; port:int=Field(ge=1,le=65535); password:str=''; sid:int=Field(default=1,ge=1)
     name:str='Tasia Radio'; genre:str=''; url:str=''; public:bool=False
@@ -499,6 +506,123 @@ def playlist_library_bulk(body:LibraryBulk,user:dict=Depends(current_user)):
     _safe_library_folder(user,body.folder)
     rows=_library_bulk_rows(user['id'],body.folder,body.q,body.recursive)
     return {'ok':True,'added':_playlist_library_rows(user['id'],rows)}
+SAVED_PLAYLIST_STATE_KEY='active_saved_playlist_id'
+
+
+def _active_saved_playlist_id(user_id:int)->int|None:
+    raw=db.get_state(user_id,SAVED_PLAYLIST_STATE_KEY,None)
+    try:
+        playlist_id=int(raw)
+    except (TypeError,ValueError):
+        return None
+    if db.saved_playlist_by_id(user_id,playlist_id):
+        return playlist_id
+    db.set_state(user_id,SAVED_PLAYLIST_STATE_KEY,None)
+    return None
+
+
+@app.get('/api/saved-playlists')
+def saved_playlists(user:dict=Depends(current_user)):
+    return {
+        'items':db.list_saved_playlists(user['id']),
+        'active_id':_active_saved_playlist_id(user['id']),
+    }
+
+
+@app.post('/api/saved-playlists')
+def create_saved_playlist(body:SavedPlaylistCreate,user:dict=Depends(current_user)):
+    uid=user['id']
+    source=str(body.source or 'playlist').strip().lower()
+    try:
+        if source=='queue':
+            saved=db.save_queue_as_playlist(uid,body.name)
+        elif source=='playlist':
+            saved=db.create_saved_playlist(uid,body.name,db.list_playlist(uid))
+        else:
+            raise ValueError('Playlist source must be playlist or queue')
+    except ValueError as exc:
+        raise HTTPException(409,str(exc)) from exc
+    if body.activate and source=='playlist':
+        db.set_state(uid,SAVED_PLAYLIST_STATE_KEY,int(saved['id']))
+    return {'ok':True,'playlist':saved,'active_id':_active_saved_playlist_id(uid)}
+
+
+@app.put('/api/saved-playlists/{playlist_id}')
+def update_saved_playlist(playlist_id:int,body:SavedPlaylistUpdate,user:dict=Depends(current_user)):
+    uid=user['id']
+    existing=db.saved_playlist_by_id(uid,playlist_id)
+    if not existing:
+        raise HTTPException(404,'Saved playlist not found')
+    try:
+        rows=db.list_playlist(uid) if body.save_current else None
+        saved=db.update_saved_playlist(uid,playlist_id,rows=rows,name=body.name)
+    except ValueError as exc:
+        raise HTTPException(409,str(exc)) from exc
+    if body.save_current:
+        db.set_state(uid,SAVED_PLAYLIST_STATE_KEY,playlist_id)
+    return {'ok':True,'playlist':saved,'active_id':_active_saved_playlist_id(uid)}
+
+
+@app.delete('/api/saved-playlists/{playlist_id}')
+def delete_saved_playlist(playlist_id:int,user:dict=Depends(current_user)):
+    uid=user['id']
+    if not db.delete_saved_playlist(uid,playlist_id):
+        raise HTTPException(404,'Saved playlist not found')
+    if _active_saved_playlist_id(uid)==playlist_id:
+        db.set_state(uid,SAVED_PLAYLIST_STATE_KEY,None)
+    return {'ok':True,'active_id':_active_saved_playlist_id(uid)}
+
+
+@app.post('/api/saved-playlists/{playlist_id}/load')
+def load_saved_playlist(playlist_id:int,append:bool=False,user:dict=Depends(current_user)):
+    uid=user['id']
+    try:
+        loaded=db.load_saved_playlist(uid,playlist_id,append=append)
+    except ValueError as exc:
+        raise HTTPException(404,str(exc)) from exc
+    if not append:
+        db.set_state(uid,SAVED_PLAYLIST_STATE_KEY,playlist_id)
+    return {'ok':True,'loaded':loaded,'active_id':_active_saved_playlist_id(uid)}
+
+
+@app.post('/api/saved-playlists/{playlist_id}/queue')
+def queue_saved_playlist(playlist_id:int,user:dict=Depends(current_user)):
+    uid=user['id']
+    try:
+        rows=db.saved_playlist_items(uid,playlist_id)
+    except ValueError as exc:
+        raise HTTPException(404,str(exc)) from exc
+    added=0; failed=[]
+    for row in rows:
+        parsed=catalogs.parse_path(str(row.get('path') or ''))
+        try:
+            if parsed:
+                _catalog_add(
+                    CatalogItem(provider=parsed[0],track_id=parsed[1]),
+                    user,'queue',metadata_override=row
+                )
+            else:
+                db.add_queue(
+                    uid,Path(row['path']),row['title'],row.get('artist') or '',
+                    row.get('source_type') or 'playlist',row.get('source_url'),row.get('duration')
+                )
+            added+=1
+        except Exception as exc:
+            failed.append({
+                'id':row.get('id'),
+                'title':row.get('title'),
+                'error':str(getattr(exc,'detail',exc)),
+            })
+    return {'ok':not failed,'queued':added,'failed':failed}
+
+
+@app.post('/api/playlist/new')
+def new_working_playlist(user:dict=Depends(current_user)):
+    db.clear_playlist(user['id'])
+    db.set_state(user['id'],SAVED_PLAYLIST_STATE_KEY,None)
+    return {'ok':True,'active_id':None}
+
+
 @app.post('/api/queue/all-playlist')
 def queue_all_playlist(user:dict=Depends(current_user)):
     added=0; failed=[]
