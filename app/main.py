@@ -556,7 +556,15 @@ def _txt_norm(value:str)->str:
     return re.sub(r'[^a-z0-9]+',' ',str(value or '').lower()).strip()
 
 
+_TXT_LOCAL_INDEX_CACHE:dict[int,tuple[float,dict[str,dict]]]={}
+_TXT_LOCAL_INDEX_TTL=30.0
+
+
 def _txt_local_index(user_id:int)->dict[str,dict]:
+    cached=_TXT_LOCAL_INDEX_CACHE.get(int(user_id))
+    now=time.time()
+    if cached and now-cached[0] < _TXT_LOCAL_INDEX_TTL:
+        return cached[1]
     index={}
     for row in db.list_library(user_id,limit=100000):
         title=str(row.get('title') or '')
@@ -566,6 +574,7 @@ def _txt_local_index(user_id:int)->dict[str,dict]:
         for key in keys:
             if key and key not in index:
                 index[key]=row
+    _TXT_LOCAL_INDEX_CACHE[int(user_id)]=(now,index)
     return index
 
 
@@ -723,7 +732,20 @@ def _txt_find_catalog(user:dict,value:str,source:str)->dict:
         # Explicit URLs always win over the text-search selector. This lets one
         # mixed TXT contain Spotify, SoundCloud, GDrive and normal song names.
         rows=catalogs.search(url_provider,db.get_catalog_settings(user['id'],url_provider),value,1)
-    elif source in {'auto','all'}:
+    elif source=='auto':
+        # Fast path for normal Artist - Title lists. Spotify public metadata is
+        # usually enough, so do not make every import line wait for Universal
+        # and Audius too. If Spotify is unavailable or has no result, fall back
+        # to the remaining configured online sources.
+        rows=[]
+        try:
+            rows=catalogs.search('btch-spotify',db.get_catalog_settings(user['id'],'btch-spotify'),value,6)
+        except Exception:
+            rows=[]
+        if not rows:
+            fallback=[p for p in _searchable_catalogs(user['id']) if p!='btch-spotify']
+            rows=_search_catalogs(user['id'],value,12,providers=fallback)
+    elif source=='all':
         rows=_search_catalogs(user['id'],value,12)
     else:
         provider=source
