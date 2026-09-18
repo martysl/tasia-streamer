@@ -26,7 +26,7 @@ def _cache_path(settings: dict) -> Path:
     user_id = int(settings.get("user_id") or 0)
     root = USER_DATA_DIR / str(user_id if user_id > 0 else 0) / "cache"
     root.mkdir(parents=True, exist_ok=True)
-    return root / "spotify-search-v1.json"
+    return root / "spotify-search-v2.json"
 
 
 def _cache_key(query: str) -> str:
@@ -38,9 +38,9 @@ def _load_cache(settings: dict) -> dict:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {"version": 1, "entries": {}}
+        return {"version": 2, "entries": {}}
     if not isinstance(payload, dict) or not isinstance(payload.get("entries"), dict):
-        return {"version": 1, "entries": {}}
+        return {"version": 2, "entries": {}}
     return payload
 
 
@@ -49,7 +49,7 @@ def _save_cache(settings: dict, payload: dict) -> None:
     entries = payload.get("entries") if isinstance(payload, dict) else None
     if not isinstance(entries, dict):
         entries = {}
-        payload = {"version": 1, "entries": entries}
+        payload = {"version": 2, "entries": entries}
 
     now = time.time()
     valid = []
