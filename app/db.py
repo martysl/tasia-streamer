@@ -91,6 +91,28 @@ def init_db() -> None:
               added_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_user_playlist_owner ON user_playlist(user_id, position);
+            CREATE TABLE IF NOT EXISTS user_saved_playlists (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER NOT NULL,
+              name TEXT NOT NULL COLLATE NOCASE,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              UNIQUE(user_id, name)
+            );
+            CREATE INDEX IF NOT EXISTS idx_saved_playlists_owner ON user_saved_playlists(user_id, updated_at);
+            CREATE TABLE IF NOT EXISTS user_saved_playlist_items (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              playlist_id INTEGER NOT NULL,
+              path TEXT NOT NULL,
+              title TEXT NOT NULL,
+              artist TEXT NOT NULL DEFAULT '',
+              source_type TEXT NOT NULL,
+              source_url TEXT,
+              duration REAL,
+              position INTEGER NOT NULL,
+              added_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_saved_playlist_items_list ON user_saved_playlist_items(playlist_id, position);
             CREATE TABLE IF NOT EXISTS user_state (
               user_id INTEGER NOT NULL,
               key TEXT NOT NULL,
@@ -771,6 +793,178 @@ def queue_all_playlist(user_id: int) -> int:
     rows=list_playlist(user_id)
     for r in rows: add_queue(user_id,Path(r["path"]),r["title"],r["artist"],r["source_type"],r.get("source_url"),r.get("duration"))
     return len(rows)
+
+
+def _saved_playlist_name(name: str) -> str:
+    value=" ".join(str(name or "").strip().split())
+    if not value:
+        raise ValueError("Playlist name cannot be empty")
+    if len(value) > 120:
+        raise ValueError("Playlist name is too long")
+    return value
+
+
+def _replace_saved_playlist_items(conn: sqlite3.Connection, playlist_id: int, rows: list[dict[str, Any]]) -> None:
+    conn.execute("DELETE FROM user_saved_playlist_items WHERE playlist_id=?", (playlist_id,))
+    for position,row in enumerate(rows,1):
+        conn.execute(
+            """INSERT INTO user_saved_playlist_items
+               (playlist_id,path,title,artist,source_type,source_url,duration,position,added_at)
+               VALUES(?,?,?,?,?,?,?,?,?)""",
+            (
+                playlist_id,
+                str(row.get("path") or ""),
+                str(row.get("title") or "Untitled"),
+                str(row.get("artist") or ""),
+                str(row.get("source_type") or "library"),
+                row.get("source_url"),
+                row.get("duration"),
+                position,
+                now_iso(),
+            ),
+        )
+
+
+def list_saved_playlists(user_id: int) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows=conn.execute(
+            """SELECT p.id,p.user_id,p.name,p.created_at,p.updated_at,
+                      COUNT(i.id) AS track_count,
+                      COALESCE(SUM(COALESCE(i.duration,0)),0) AS duration
+               FROM user_saved_playlists p
+               LEFT JOIN user_saved_playlist_items i ON i.playlist_id=p.id
+               WHERE p.user_id=?
+               GROUP BY p.id
+               ORDER BY lower(p.name),p.id""",
+            (user_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def saved_playlist_by_id(user_id: int, playlist_id: int) -> dict[str, Any] | None:
+    with connect() as conn:
+        row=conn.execute(
+            """SELECT p.id,p.user_id,p.name,p.created_at,p.updated_at,
+                      COUNT(i.id) AS track_count,
+                      COALESCE(SUM(COALESCE(i.duration,0)),0) AS duration
+               FROM user_saved_playlists p
+               LEFT JOIN user_saved_playlist_items i ON i.playlist_id=p.id
+               WHERE p.user_id=? AND p.id=?
+               GROUP BY p.id""",
+            (user_id,playlist_id),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def saved_playlist_items(user_id: int, playlist_id: int) -> list[dict[str, Any]]:
+    with connect() as conn:
+        owner=conn.execute(
+            "SELECT id FROM user_saved_playlists WHERE user_id=? AND id=?",
+            (user_id,playlist_id),
+        ).fetchone()
+        if not owner:
+            raise ValueError("Saved playlist not found")
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM user_saved_playlist_items WHERE playlist_id=? ORDER BY position,id",
+            (playlist_id,),
+        )]
+
+
+def create_saved_playlist(user_id: int, name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    clean=_saved_playlist_name(name)
+    with connect() as conn:
+        try:
+            cur=conn.execute(
+                "INSERT INTO user_saved_playlists(user_id,name,created_at,updated_at) VALUES(?,?,?,?)",
+                (user_id,clean,now_iso(),now_iso()),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("A playlist with that name already exists") from exc
+        playlist_id=int(cur.lastrowid)
+        _replace_saved_playlist_items(conn,playlist_id,rows)
+    result=saved_playlist_by_id(user_id,playlist_id)
+    if not result:
+        raise ValueError("Saved playlist could not be created")
+    return result
+
+
+def update_saved_playlist(user_id: int, playlist_id: int, rows: list[dict[str, Any]] | None = None, name: str | None = None) -> dict[str, Any]:
+    with connect() as conn:
+        current=conn.execute(
+            "SELECT * FROM user_saved_playlists WHERE user_id=? AND id=?",
+            (user_id,playlist_id),
+        ).fetchone()
+        if not current:
+            raise ValueError("Saved playlist not found")
+        if name is not None:
+            clean=_saved_playlist_name(name)
+            try:
+                conn.execute(
+                    "UPDATE user_saved_playlists SET name=?,updated_at=? WHERE user_id=? AND id=?",
+                    (clean,now_iso(),user_id,playlist_id),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("A playlist with that name already exists") from exc
+        if rows is not None:
+            _replace_saved_playlist_items(conn,playlist_id,rows)
+            conn.execute(
+                "UPDATE user_saved_playlists SET updated_at=? WHERE user_id=? AND id=?",
+                (now_iso(),user_id,playlist_id),
+            )
+    result=saved_playlist_by_id(user_id,playlist_id)
+    if not result:
+        raise ValueError("Saved playlist not found")
+    return result
+
+
+def delete_saved_playlist(user_id: int, playlist_id: int) -> bool:
+    with connect() as conn:
+        row=conn.execute(
+            "SELECT id FROM user_saved_playlists WHERE user_id=? AND id=?",
+            (user_id,playlist_id),
+        ).fetchone()
+        if not row:
+            return False
+        conn.execute("DELETE FROM user_saved_playlist_items WHERE playlist_id=?", (playlist_id,))
+        conn.execute("DELETE FROM user_saved_playlists WHERE user_id=? AND id=?", (user_id,playlist_id))
+        return True
+
+
+def load_saved_playlist(user_id: int, playlist_id: int, append: bool = False) -> int:
+    rows=saved_playlist_items(user_id,playlist_id)
+    with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if not append:
+            conn.execute("DELETE FROM user_playlist WHERE user_id=?", (user_id,))
+            start=0
+        else:
+            start=int(conn.execute(
+                "SELECT COALESCE(MAX(position),0) FROM user_playlist WHERE user_id=?",
+                (user_id,),
+            ).fetchone()[0])
+        for offset,row in enumerate(rows,1):
+            conn.execute(
+                """INSERT INTO user_playlist
+                   (user_id,path,title,artist,source_type,source_url,duration,position,added_at)
+                   VALUES(?,?,?,?,?,?,?,?,?)""",
+                (
+                    user_id,row["path"],row["title"],row.get("artist") or "",
+                    row["source_type"],row.get("source_url"),row.get("duration"),
+                    start+offset,now_iso(),
+                ),
+            )
+    return len(rows)
+
+
+def save_working_playlist(user_id: int, name: str, playlist_id: int | None = None) -> dict[str, Any]:
+    rows=list_playlist(user_id)
+    if playlist_id is None:
+        return create_saved_playlist(user_id,name,rows)
+    return update_saved_playlist(user_id,playlist_id,rows=rows,name=name or None)
+
+
+def save_queue_as_playlist(user_id: int, name: str) -> dict[str, Any]:
+    return create_saved_playlist(user_id,name,list_queue(user_id))
 
 
 def queue_all_library(user_id: int) -> int:

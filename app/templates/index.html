@@ -94,7 +94,7 @@
           <div class="progress-track"><div id="progressFill"></div></div>
           <div class="progress-row"><span id="progressElapsed">0:00</span><span id="progressRemaining">-0:00</span><span id="progressDuration">0:00</span></div><div id="playbackError" class="msg bad hidden"></div>
         </div>
-        <div class="pane-head"><div><span class="label">QUEUE</span><strong>Next on air</strong></div><div class="head-actions"><button id="queuePlaylist" class="tiny">Queue Playlist</button><button id="clearQueue" class="ghost tiny">Clear</button></div></div>
+        <div class="pane-head"><div><span class="label">QUEUE</span><strong>Next on air</strong></div><div class="head-actions"><button id="saveQueuePlaylist" class="ghost tiny">Save Queue</button><button id="queuePlaylist" class="tiny">Queue Playlist</button><button id="clearQueue" class="ghost tiny">Clear</button></div></div>
         <div class="hint">Drag songs or edit their position number. The preloaded “ON DECK” row is locked.</div>
         <div id="queuePlaylistMsg" class="msg hidden"></div>
         <div id="queue" class="tracklist queue-list"></div>
@@ -102,7 +102,18 @@
 
       <section class="pane playlist-pane">
         <div class="pane-head"><div><span class="label">PLAYLIST</span><strong>Set builder</strong></div><div class="head-actions"><button id="importTxtOpen" class="ghost tiny">Import TXT</button><button id="clearPlaylist" class="ghost tiny">Clear</button></div></div>
-        <div class="hint">Drag songs or type a position number to build the set. Times show where each song lands if the set starts now.</div>
+        <div class="playlist-manager">
+          <select id="savedPlaylistSelect" title="Saved playlists"><option value="">Unsaved set</option></select>
+          <button id="playlistNew" class="ghost tiny" title="Start a new working set">New</button>
+          <button id="playlistLoad" class="ghost tiny" title="Load selected playlist into the set builder">Load</button>
+          <button id="playlistQueueSaved" class="tiny" title="Queue selected saved playlist without loading it">Queue</button>
+          <button id="playlistSave" class="tiny" title="Save changes to the active named playlist">Save</button>
+          <button id="playlistSaveAs" class="ghost tiny" title="Save the working set under a new name">Save As</button>
+          <button id="playlistRename" class="ghost tiny" title="Rename selected saved playlist">Rename</button>
+          <button id="playlistDelete" class="ghost tiny danger-lite" title="Delete selected saved playlist">Delete</button>
+        </div>
+        <div id="playlistManagerMsg" class="mini-summary playlist-manager-msg">Unsaved working set</div>
+        <div class="hint">The set builder is your working copy. Save named sets, reopen them later, or send a saved set straight to Queue.</div>
         <div id="playlist" class="tracklist"></div>
         <div class="suno-box">
           <span class="label">SUNO / DIRECT AUDIO</span>
