@@ -544,7 +544,7 @@ def queue_playlist_item(item_id:int,user:dict=Depends(current_user)):
     if not t: raise HTTPException(404,'Playlist item not found')
     parsed=catalogs.parse_path(str(t.get('path') or ''))
     if parsed:
-        return _catalog_add(CatalogItem(provider=parsed[0],track_id=parsed[1]),user,'queue')
+        return _catalog_add(CatalogItem(provider=parsed[0],track_id=parsed[1]),user,'queue',metadata_override=t)
     return {'ok':True,'queue_id':db.add_queue(user['id'],Path(t['path']),t['title'],t['artist'],t['source_type'],t.get('source_url'),t.get('duration'))}
 
 @app.delete('/api/playlist/{item_id}')
@@ -643,7 +643,15 @@ def _catalog_result_to_target(user:dict,provider:str,track:dict,target:str)->dic
         fav=db.upsert_favorite(user['id'],fingerprint=f"catalog|{provider}|{track['id']}",kind='catalog',provider=provider,track_id=str(track['id']),
                                title=track['title'],artist=track.get('artist') or '',duration=track.get('duration'),source_url=track.get('url') or '',artwork=track.get('artwork') or '')
         return {'id':fav['id'],'provider':provider,'title':track['title'],'artist':track.get('artist') or '','url':track.get('url') or '','track_id':str(track['id'])}
-    result=_catalog_add(CatalogItem(provider=provider,track_id=str(track['id'])),user,target)
+    if target=='playlist':
+        # Search already returned canonical catalog metadata. A playlist is only
+        # a set plan, so store that reference directly and defer actual media
+        # resolution/download until Queue. This also prevents BTCH/YouTube-style
+        # fallback titles from replacing Spotify titles.
+        path=catalogs.make_path(provider,str(track['id']))
+        item=db.add_playlist(user['id'],path,track['title'],track.get('artist') or '',provider,track.get('url') or None,track.get('duration'))
+        return {'id':item,'provider':provider,'title':track['title'],'artist':track.get('artist') or '','url':track.get('url') or '','track_id':str(track['id'])}
+    result=_catalog_add(CatalogItem(provider=provider,track_id=str(track['id'])),user,target,metadata_override=track)
     return {'id':result.get('queue_id') or result.get('playlist_id'),'provider':provider,'title':track['title'],'artist':track.get('artist') or '','url':track.get('url') or '','track_id':str(track['id'])}
 
 
@@ -1183,13 +1191,25 @@ def catalog_search(provider:str,q:str='',limit:int=30,user:dict=Depends(current_
     try: return catalogs.search(provider,db.get_catalog_settings(user['id'],provider),q,limit)
     except Exception as exc: raise HTTPException(400,str(exc))
 
-def _catalog_add(body:CatalogItem,user:dict,target:str):
+def _catalog_add(body:CatalogItem,user:dict,target:str,metadata_override:dict|None=None):
     provider=body.provider.lower()
     if provider not in catalogs.PROVIDERS: raise HTTPException(400,'Unsupported catalog provider')
     settings=db.get_catalog_settings(user['id'],provider)
     try: track=catalogs.get_track(provider,settings,body.track_id)
     except Exception as exc: raise HTTPException(400,str(exc))
     if track.get('access')=='blocked': raise HTTPException(400,f'{provider} says this track is not streamable')
+    # A resolver may use a different upstream media source (for example a
+    # YouTube-style fallback for Spotify audio). Keep the catalog/playlist
+    # metadata the user selected instead of letting downloader metadata replace
+    # the visible song title/artist.
+    if metadata_override:
+        if str(metadata_override.get('title') or '').strip():
+            track['title']=str(metadata_override.get('title')).strip()
+        if str(metadata_override.get('artist') or '').strip():
+            track['artist']=str(metadata_override.get('artist')).strip()
+        if metadata_override.get('duration') not in (None,''):
+            try: track['duration']=float(metadata_override.get('duration'))
+            except (TypeError,ValueError): pass
     if provider=='universal' and target=='queue':
         try: path,duration=universal.cache_track(track['id'],user['id'],settings.get('base_url'))
         except Exception as exc: raise HTTPException(400,str(exc))
