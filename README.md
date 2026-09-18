@@ -4,6 +4,12 @@ A compact multi-user SHOUTcast DJ workstation built around FastAPI + SQLite + FF
 
 Beta29 keeps the multi-source workstation and now uses SpotipyFree + SpotiFLAC for Spotify, Tioo for direct SoundCloud links, BTCH only where still needed (currently Google Drive), plus the existing Suno resolver stack.
 
+## Named playlists and set workflow
+
+The right-hand Set Builder is now a working copy rather than the only playlist. You can save any working set under a name, reopen it later, queue a saved set directly, overwrite the active saved set with **Save**, make variants with **Save As**, rename/delete saved sets, or start a fresh unsaved set with **New**. The Queue also has **Save Queue**, which snapshots the current queue order into a new named playlist without changing the working set.
+
+Saved playlists preserve track order, title/artist metadata, duration, source type and original source URL. Existing `user_playlist` rows remain the working set, so upgrades do not discard the playlist already being edited.
+
 ## Multi-source search and song-list import (beta29)
 
 The Online tab now has **All Sources**, which searches Spotify, Universal Search, Audius and any configured SoundCloud, Jamendo and Stremio sources in parallel. Matching versions from different services stay visible so you can choose the provider.
