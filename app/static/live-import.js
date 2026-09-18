@@ -163,7 +163,12 @@
   async function queuePlaylistOneByOne() {
     const button = $('queuePlaylist');
     const originalLabel = button.textContent;
+    const msg = $('queuePlaylistMsg');
     button.disabled = true;
+    if (msg) {
+      msg.className = 'msg';
+      msg.textContent = 'Preparing playlist queue…';
+    }
 
     try {
       await refreshAll();
@@ -182,14 +187,32 @@
           await api(`/api/playlist/${Number(item.id)}/queue`, {method: 'POST'});
           queued += 1;
         } catch (e) {
-          failed.push({id: item.id, title: item.title || `Playlist item ${item.id}`, error: e.message || String(e)});
+          failed.push({
+            id: item.id,
+            title: item.title || `Playlist item ${item.id}`,
+            error: e.message || String(e)
+          });
         }
 
-        // Each track appears in Queue immediately after its resolver/cache step.
+        // Each successful track should appear in Queue immediately.
         try { await refreshAll(); } catch (_) {}
+
+        if (msg) {
+          const latest = failed.length ? failed[failed.length - 1] : null;
+          msg.className = failed.length ? 'msg bad' : 'msg good';
+          msg.textContent = failed.length
+            ? `Processed ${index + 1}/${items.length} · ${queued} queued · ${failed.length} failed · Last: ${latest.title}: ${latest.error}`
+            : `Processed ${index + 1}/${items.length} · ${queued} queued · 0 failed`;
+        }
         await sleep(0);
       }
 
+      if (msg) {
+        msg.className = failed.length ? 'msg bad' : 'msg good';
+        msg.textContent = failed.length
+          ? `Finished: ${queued} queued · ${failed.length} failed. Last error: ${failed[failed.length - 1].error}`
+          : `Finished: ${queued} playlist tracks queued.`;
+      }
       const suffix = failed.length ? ` ${failed.length} failed to resolve.` : '';
       alert(`Queued ${queued} playlist tracks.${suffix}`);
     } finally {
@@ -199,7 +222,7 @@
     }
   }
 
-  function safeDownloadName(value) {
+    function safeDownloadName(value) {
     const base = String(value || 'Suno track')
       .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
       .replace(/\s+/g, ' ')
