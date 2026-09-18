@@ -413,7 +413,10 @@ def _is_previewable(value:Any)->bool:
 
 def _timed_queue(user_id:int)->tuple[list[dict],dict]:
     rows=[_safe_list_row(r) for r in db.list_queue(user_id)]; np=_progress(user_id); state=db.get_state(user_id,'playout_state','stopped'); now=time.time()
-    on_air=state=='playing' and engine.status(user_id).get('output_active') is True
+    eng_status=engine.status(user_id)
+    # `shoutcast.status` text has changed across Liquidsoap releases, so the
+    # actual interactive playout bool is the authoritative paused/playing bit.
+    on_air=state=='playing' and eng_status.get('playout_enabled') is True and eng_status.get('output_active') is not False
     remaining=_safe_duration(np.get('remaining')) if np else 0.0; remaining=remaining or 0.0; cursor=remaining
     audio_seconds=0.0
     for row in rows:
@@ -1406,9 +1409,13 @@ def control_connect(user:dict=Depends(current_user)):
     try:
         repair_user_storage(user,db)
         engine.ensure(uid)
-        if db.get_state(uid,'playout_state','stopped')!='playing': engine.command(uid,'var.set tasia_playout = false',ensure_engine=False)
+        desired_playing=db.get_state(uid,'playout_state','stopped')=='playing'
+        engine.set_playout(uid,desired_playing)
         reply=engine.connect_output(uid)
-        if db.get_state(uid,'playout_state','stopped')=='playing': _resume_clock(uid)
+        # Re-assert after output start too; this closes a rare engine/output race
+        # that could leave SHOUTcast connected while Liquidsoap fed blank().
+        engine.set_playout(uid,desired_playing)
+        if desired_playing: _resume_clock(uid)
     except Exception as exc: raise HTTPException(503,str(exc))
     return {'ok':True,'liquidsoap':reply,'shoutcast':engine.status(uid)}
 @app.post('/api/control/disconnect')
@@ -1431,23 +1438,32 @@ def control_disconnect(user:dict=Depends(current_user)):
 @app.post('/api/control/play')
 def control_play(user:dict=Depends(current_user)):
     uid=user['id']
+    previous=db.get_state(uid,'playout_state','stopped')
+    db.set_state(uid,'playout_state','playing')
     try:
         repair_user_storage(user,db)
-        reply=_clean(engine.command(uid,'var.set tasia_playout = true'))
-        if engine.status(uid).get('output_active') is True: _resume_clock(uid)
-    except Exception as exc: raise HTTPException(503,str(exc))
-    db.set_state(uid,'playout_state','playing'); return {'ok':True,'liquidsoap':reply}
+        reply=engine.set_playout(uid,True)
+        _resume_clock(uid)
+    except Exception as exc:
+        db.set_state(uid,'playout_state',previous)
+        raise HTTPException(503,str(exc))
+    return {'ok':True,'liquidsoap':reply,'playout_enabled':engine.playout_enabled(uid)}
 @app.post('/api/control/pause')
 def control_pause(user:dict=Depends(current_user)):
     uid=user['id']
-    try: reply=_clean(engine.command(uid,'var.set tasia_playout = false'))
-    except Exception as exc: raise HTTPException(503,str(exc))
-    _freeze_clock(uid); db.set_state(uid,'playout_state','paused'); return {'ok':True,'liquidsoap':reply}
+    previous=db.get_state(uid,'playout_state','stopped')
+    db.set_state(uid,'playout_state','paused')
+    try: reply=engine.set_playout(uid,False)
+    except Exception as exc:
+        db.set_state(uid,'playout_state',previous)
+        raise HTTPException(503,str(exc))
+    _freeze_clock(uid)
+    return {'ok':True,'liquidsoap':reply,'playout_enabled':engine.playout_enabled(uid)}
 @app.post('/api/control/stop')
 def control_stop(user:dict=Depends(current_user)):
     uid=user['id']
     try:
-        a=_clean(engine.command(uid,'var.set tasia_playout = false')); b=_clean(engine.command(uid,'scheduler.skip'))
+        a=engine.set_playout(uid,False); b=_clean(engine.command(uid,'scheduler.skip'))
     except Exception as exc: raise HTTPException(503,str(exc))
     db.set_state(uid,'playout_state','stopped'); db.set_state(uid,'now_playing',None); return {'ok':True,'liquidsoap':{'pause':a,'skip':b}}
 @app.post('/api/skip')
