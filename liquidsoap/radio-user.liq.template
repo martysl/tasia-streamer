@@ -26,10 +26,31 @@ add_skip_command(scheduler)
 
 # DJ play/pause. Pause keeps SHOUTcast connected and feeds silence.
 tasia_playout = interactive.bool("tasia_playout", true)
-radio = switch(track_sensitive=false, [
+music = switch(track_sensitive=false, [
   ({tasia_playout()}, scheduler),
   ({true}, blank())
 ])
+
+# Live LSL/OpenSim speech behaves like a DJ microphone rather than a scheduled
+# track. Python pushes the finished Edge-TTS file with:
+#   tasia_live.push file:///data/users/.../tts/tasia-....mp3
+#
+# While a voice request is ready/playing, music is ducked to 30% and Tasia is
+# mixed at full level. As soon as the voice queue becomes empty, music returns
+# to normal automatically. clip() protects the final mix from rare summed peaks.
+tasia_live = request.queue(
+  id="tasia_live",
+  interactive=true,
+  prefetch=1,
+  timeout=30.
+)
+ducked_music = amplify(
+  override=null,
+  {if tasia_live.is_ready() then 0.30 else 1.0 end},
+  music
+)
+radio = add(normalize=false, [ducked_music, tasia_live])
+radio = clip(radio)
 
 # Track metadata on the FINAL source that feeds the output, not merely on a
 # prefetched request. This keeps "On Air" tied to what the output is pulling.
