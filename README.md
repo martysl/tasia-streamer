@@ -2,7 +2,7 @@
 
 A compact multi-user SHOUTcast DJ workstation built around FastAPI + SQLite + FFmpeg + Liquidsoap 2.4.5.
 
-Beta29 keeps the multi-source/BTCH work and can use a private keyed Suno downloader for public Suno UUID/song playback, while retaining the older Suno resolver paths as fallbacks.
+Beta29 keeps the multi-source workstation and now uses SpotipyFree + SpotiFLAC for Spotify, Tioo for direct SoundCloud links, BTCH only where still needed (currently Google Drive), plus the existing Suno resolver stack.
 
 ## Multi-source search and song-list import (beta29)
 
