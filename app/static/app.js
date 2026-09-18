@@ -3,6 +3,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const enc = s => encodeURIComponent(String(s ?? '')).replace(/'/g,'%27');
 const state = {
   user:null, needsSetup:false, status:null, queue:[], playlist:[],
+  savedPlaylists:[], activeSavedPlaylistId:null, savedPlaylistSelection:null,
   libraryView:{path:'',parent:'',search:'',folders:[],tracks:[],stats:{}},
   libraryPath:'', favorites:[], sources:[], sourceRows:[], sourcePath:'', sourceId:null, sourceSearch:'', catalogResults:[], catalogSettings:{}, drag:null, nowReceived:0
 };
@@ -59,7 +60,7 @@ $('logoutBtn').onclick=async()=>{await api('/api/auth/logout',{method:'POST'});l
 
 async function initialLoad() {
   state.libraryPath=''; $('librarySearch').value='';
-  await Promise.all([loadLibrary(),loadFavorites(),loadSources(),refreshAll()]);
+  await Promise.all([loadLibrary(),loadFavorites(),loadSources(),loadSavedPlaylists(),refreshAll()]);
 }
 
 // Local private library browser ------------------------------------------------
@@ -207,6 +208,129 @@ function renderPlaylist() {
   </div>`).join(''):'<div class="empty">Playlist empty.</div>';
   enableDnD($('playlist'),'/api/playlist/reorder');
 }
+function selectedSavedPlaylist(){
+  const id=Number(state.savedPlaylistSelection||0);
+  return state.savedPlaylists.find(p=>Number(p.id)===id)||null;
+}
+function renderSavedPlaylists(){
+  const select=$('savedPlaylistSelect');
+  if(!select)return;
+  const previous=Number(state.savedPlaylistSelection||state.activeSavedPlaylistId||0);
+  select.innerHTML='<option value="">Unsaved set</option>'+state.savedPlaylists.map(p=>{
+    const active=Number(p.id)===Number(state.activeSavedPlaylistId);
+    return `<option value="${Number(p.id)}">${active?'● ':''}${esc(p.name)} · ${Number(p.track_count)||0}</option>`;
+  }).join('');
+  const exists=state.savedPlaylists.some(p=>Number(p.id)===previous);
+  const chosen=exists?previous:(Number(state.activeSavedPlaylistId)||0);
+  select.value=chosen?String(chosen):'';
+  state.savedPlaylistSelection=chosen||null;
+  const row=selectedSavedPlaylist();
+  const msg=$('playlistManagerMsg');
+  if(row){
+    const active=Number(row.id)===Number(state.activeSavedPlaylistId);
+    msg.textContent=`${active?'Active':'Selected'}: ${row.name} · ${Number(row.track_count)||0} tracks · ${sec(row.duration)}`;
+  }else{
+    msg.textContent=state.activeSavedPlaylistId?'Saved playlist active':'Unsaved working set';
+  }
+}
+async function loadSavedPlaylists(){
+  try{
+    const r=await api('/api/saved-playlists');
+    state.savedPlaylists=r.items||[];
+    state.activeSavedPlaylistId=r.active_id||null;
+    renderSavedPlaylists();
+  }catch(e){
+    const msg=$('playlistManagerMsg');
+    if(msg)msg.textContent=e.message;
+  }
+}
+function askPlaylistName(title,initial=''){
+  const value=window.prompt(title,initial||'');
+  if(value===null)return null;
+  const clean=value.trim().replace(/\s+/g,' ');
+  if(!clean){alert('Playlist name cannot be empty.');return null;}
+  return clean;
+}
+$('savedPlaylistSelect').onchange=()=>{
+  state.savedPlaylistSelection=Number($('savedPlaylistSelect').value)||null;
+  renderSavedPlaylists();
+};
+$('playlistSaveAs').onclick=async()=>{
+  const name=askPlaylistName('Save working set as:',selectedSavedPlaylist()?.name||'');
+  if(!name)return;
+  try{
+    const r=await api('/api/saved-playlists',jsonOpts('POST',{name,source:'playlist',activate:true}));
+    state.activeSavedPlaylistId=r.active_id||r.playlist?.id||null;
+    state.savedPlaylistSelection=state.activeSavedPlaylistId;
+    await loadSavedPlaylists();
+    $('playlistManagerMsg').textContent=`Saved “${r.playlist.name}” · ${r.playlist.track_count} tracks`;
+  }catch(e){alert(e.message);}
+};
+$('playlistSave').onclick=async()=>{
+  const id=Number(state.activeSavedPlaylistId||0);
+  if(!id){$('playlistSaveAs').click();return;}
+  try{
+    const r=await api(`/api/saved-playlists/${id}`,jsonOpts('PUT',{save_current:true}));
+    state.savedPlaylistSelection=id;
+    await loadSavedPlaylists();
+    $('playlistManagerMsg').textContent=`Saved “${r.playlist.name}” · ${r.playlist.track_count} tracks`;
+  }catch(e){alert(e.message);}
+};
+$('playlistLoad').onclick=async()=>{
+  const row=selectedSavedPlaylist();
+  if(!row){alert('Choose a saved playlist first.');return;}
+  if(state.playlist.length && !confirm(`Replace the working set with “${row.name}”? Unsaved changes in the working set will be lost.`))return;
+  try{
+    await api(`/api/saved-playlists/${row.id}/load`,{method:'POST'});
+    state.activeSavedPlaylistId=Number(row.id);
+    state.savedPlaylistSelection=Number(row.id);
+    await Promise.all([refreshAll(),loadSavedPlaylists()]);
+  }catch(e){alert(e.message);}
+};
+$('playlistQueueSaved').onclick=async()=>{
+  const row=selectedSavedPlaylist();
+  if(!row){alert('Choose a saved playlist first.');return;}
+  const msg=$('playlistManagerMsg');
+  msg.textContent=`Queuing “${row.name}”…`;
+  try{
+    const r=await api(`/api/saved-playlists/${row.id}/queue`,{method:'POST'});
+    await refreshAll();
+    msg.textContent=`Queued “${row.name}”: ${r.queued||0} tracks${r.failed?.length?` · ${r.failed.length} failed`:''}`;
+    if(r.failed?.length)alert(r.failed.slice(0,5).map(x=>`${x.title}: ${x.error}`).join('\n'));
+  }catch(e){msg.textContent=e.message;alert(e.message);}
+};
+$('playlistNew').onclick=async()=>{
+  if(state.playlist.length && !confirm('Start a new empty working set? Save this set first if you want to keep it.'))return;
+  try{
+    await api('/api/playlist/new',{method:'POST'});
+    state.activeSavedPlaylistId=null;
+    state.savedPlaylistSelection=null;
+    await Promise.all([refreshAll(),loadSavedPlaylists()]);
+  }catch(e){alert(e.message);}
+};
+$('playlistRename').onclick=async()=>{
+  const row=selectedSavedPlaylist();
+  if(!row){alert('Choose a saved playlist first.');return;}
+  const name=askPlaylistName('Rename playlist:',row.name);
+  if(!name||name===row.name)return;
+  try{
+    await api(`/api/saved-playlists/${row.id}`,jsonOpts('PUT',{name,save_current:false}));
+    state.savedPlaylistSelection=Number(row.id);
+    await loadSavedPlaylists();
+  }catch(e){alert(e.message);}
+};
+$('playlistDelete').onclick=async()=>{
+  const row=selectedSavedPlaylist();
+  if(!row){alert('Choose a saved playlist first.');return;}
+  if(!confirm(`Delete saved playlist “${row.name}”? The working set and cached audio are not deleted.`))return;
+  try{
+    await api(`/api/saved-playlists/${row.id}`,{method:'DELETE'});
+    if(Number(state.activeSavedPlaylistId)===Number(row.id))state.activeSavedPlaylistId=null;
+    state.savedPlaylistSelection=null;
+    await loadSavedPlaylists();
+  }catch(e){alert(e.message);}
+};
+
 window.positionKey=(event,kind,id,input)=>{
   // Submit directly on Enter. Relying on blur/change was fragile because the
   // periodic status refresh can replace list DOM nodes.
@@ -342,6 +466,20 @@ window.queuePlaylistItem=async id=>{await api(`/api/playlist/${id}/queue`,{metho
 window.favoriteQueue=async id=>{try{await api(`/api/queue/${id}/favorite`,{method:'POST'});await loadFavorites();}catch(e){alert(e.message)}};
 window.favoritePlaylist=async id=>{try{await api(`/api/playlist/${id}/favorite`,{method:'POST'});await loadFavorites();}catch(e){alert(e.message)}};
 $('clearQueue').onclick=async()=>{await api('/api/queue/clear',{method:'POST'});refreshAll();};
+$('saveQueuePlaylist').onclick=async()=>{
+  if(!state.queue.length){alert('Queue is empty.');return;}
+  const stamp=new Date().toLocaleDateString();
+  const name=askPlaylistName('Save current Queue as playlist:',`Queue ${stamp}`);
+  if(!name)return;
+  const msg=$('queuePlaylistMsg');
+  msg.className='msg';msg.classList.remove('hidden');msg.textContent='Saving Queue…';
+  try{
+    const r=await api('/api/saved-playlists',jsonOpts('POST',{name,source:'queue',activate:false}));
+    msg.className='msg good';msg.textContent=`Saved Queue as “${r.playlist.name}” · ${r.playlist.track_count} tracks`;
+    state.savedPlaylistSelection=Number(r.playlist.id);
+    await loadSavedPlaylists();
+  }catch(e){msg.className='msg bad';msg.textContent=e.message;}
+};
 $('clearPlaylist').onclick=async()=>{await api('/api/playlist/clear',{method:'POST'});refreshAll();};
 $('queuePlaylist').onclick=async()=>{const r=await api('/api/queue/all-playlist',{method:'POST'});refreshAll();alert(`Queued ${r.queued} playlist tracks.${r.failed?.length?` ${r.failed.length} failed to resolve.`:''}`);};
 
