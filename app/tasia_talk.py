@@ -19,9 +19,9 @@ from . import db
 from .auth import token_hash
 from .config import USER_DATA_DIR
 
-VOICE_DEFAULT = "en-US-AnaNeural"
-RATE_DEFAULT = "+20%"
-PITCH_DEFAULT = "+50Hz"
+VOICE_DEFAULT = "en-GB-MaisieNeural"
+RATE_DEFAULT = "+0%"
+PITCH_DEFAULT = "+0Hz"
 VOLUME_DEFAULT = "+0%"
 SETTINGS_KEY = "tasia_talk_settings"
 COUNTER_KEY = "tasia_talk_counter"
@@ -123,6 +123,18 @@ def get_settings(user_id: int, ensure_key: bool = True) -> dict[str, Any]:
     raw = db.get_state(user_id, SETTINGS_KEY, {})
     if not isinstance(raw, dict):
         raw = {}
+    # Migrate only the old built-in voice triplet. User-customized TTS settings
+    # remain untouched.
+    if (
+        str(raw.get("voice") or "") == "en-US-AnaNeural"
+        and str(raw.get("rate") or "") == "+20%"
+        and str(raw.get("pitch") or "") == "+50Hz"
+    ):
+        raw = dict(raw)
+        raw["voice"] = VOICE_DEFAULT
+        raw["rate"] = RATE_DEFAULT
+        raw["pitch"] = PITCH_DEFAULT
+        db.set_state(user_id, SETTINGS_KEY, raw)
     try:
         settings = _validate_settings(raw)
     except ValueError:
