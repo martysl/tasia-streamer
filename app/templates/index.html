@@ -80,10 +80,10 @@
           <div id="sourceBrowser" class="tracklist"></div>
         </div>
         <div id="catalogsTab" class="tabbody hidden">
-          <div class="chooserbar catalog-searchbar"><select id="catalogProvider"><option value="all">All Sources</option><option value="btch-spotify">Spotify</option><option value="universal">Universal Search</option><option value="soundcloud">SoundCloud Search</option><option value="btch-soundcloud">SoundCloud URL</option><option value="btch-gdrive">Google Drive URL</option><option value="audius">Audius</option><option value="jamendo">Jamendo</option><option value="stremio">Stremio Addon</option></select><input id="catalogSearch" placeholder="Song, artist or supported URL…"></div>
+          <div class="chooserbar catalog-searchbar"><select id="catalogProvider"><option value="all">All Sources</option><option value="btch-spotify">Spotify · SpotiFLAC</option><option value="universal">Universal Search</option><option value="soundcloud">SoundCloud Search</option><option value="btch-soundcloud">SoundCloud URL · Tioo</option><option value="btch-gdrive">Google Drive URL</option><option value="audius">Audius</option><option value="jamendo">Jamendo</option><option value="stremio">Stremio Addon</option></select><input id="catalogSearch" placeholder="Song, artist or supported URL…"></div>
           <div class="catalog-toolbar"><button id="catalogSearchBtn" class="tiny">Search</button><button id="catalogTestBtn" class="ghost tiny">Test source</button><span id="catalogStatus" class="mini-summary">Choose a provider and search.</span></div>
           <div id="catalogResults" class="tracklist"></div>
-          <div class="hint catalog-hint">Universal Search supports text search. All Sources searches Spotify, Universal, Audius and any configured SoundCloud/Jamendo/Stremio catalogs. Spotify also supports text search; SoundCloud and Google Drive BTCH resolvers accept direct URLs. Other catalogs resolve when due.</div>
+          <div class="hint catalog-hint">Universal Search supports text search. All Sources searches Spotify, Universal, Audius and any configured SoundCloud/Jamendo/Stremio catalogs. Spotify search uses SpotipyFree and Queue audio uses SpotiFLAC lossless providers. SoundCloud direct links use Tioo; Google Drive still uses BTCH. Explicit YouTube URLs continue through Universal/API only.</div>
         </div>
       </section>
 
@@ -134,7 +134,7 @@ https://open.spotify.com/track/...
 https://soundcloud.com/..."></textarea></label>
       <div class="two-input">
         <label>Import to<select id="txtImportTarget"><option value="playlist">Playlist</option><option value="queue">Queue</option><option value="favorites">★ Saved / Favourites</option></select></label>
-        <label>Find songs in<select id="txtImportSource"><option value="auto">Auto Fast (Local → Spotify → fallback)</option><option value="all">All online sources</option><option value="btch-spotify">Spotify</option><option value="universal">Universal Search</option><option value="soundcloud">SoundCloud Search</option><option value="audius">Audius</option><option value="jamendo">Jamendo</option><option value="stremio">Stremio Addon</option><option value="btch-soundcloud">SoundCloud links only</option><option value="btch-gdrive">Google Drive links only</option></select></label>
+        <label>Find songs in<select id="txtImportSource"><option value="auto">Auto Fast (Local → Spotify → fallback)</option><option value="all">All online sources</option><option value="btch-spotify">Spotify</option><option value="universal">Universal Search</option><option value="soundcloud">SoundCloud Search</option><option value="audius">Audius</option><option value="jamendo">Jamendo</option><option value="stremio">Stremio Addon</option><option value="btch-soundcloud">SoundCloud links · Tioo</option><option value="btch-gdrive">Google Drive links only</option></select></label>
       </div>
       <div class="two-input">
         <label class="check txt-check"><input id="txtSkipDuplicates" type="checkbox" checked> Skip duplicates</label>
