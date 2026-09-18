@@ -144,6 +144,8 @@ def cache_spotify_track(spotify_url: str, user_id: int) -> tuple[Path, float | N
         ok, duration = _valid_audio(final)
         if ok:
             return final, duration, None
+        if final.exists():
+            final.unlink(missing_ok=True)
 
         for stale in root.glob(f"{digest}.*"):
             if stale != final and stale.suffix.lower() in AUDIO_EXTENSIONS:
