@@ -9,7 +9,7 @@ from urllib.parse import quote, urlencode, urljoin, urlparse, unquote
 import httpx
 
 from .media import _assert_public_http_url
-from . import universal, btch
+from . import universal, btch, tioo
 
 
 class CatalogError(ValueError):
@@ -458,11 +458,15 @@ def search(provider: str, settings: dict, query: str, limit: int = 30) -> list[d
             if parsed.scheme in {"http","https"} and parsed.netloc:
                 return [btch.resolve(provider, query)]
             return _spotify_search(query, limit)
-        if provider in {"btch-soundcloud","btch-gdrive"}:
+        if provider == "btch-soundcloud":
             parsed=urlparse(query)
             if parsed.scheme not in {"http","https"} or not parsed.netloc:
-                label="SoundCloud" if provider=="btch-soundcloud" else "Google Drive"
-                raise CatalogError(f"{label} BTCH resolver needs a URL. Use SoundCloud Search or All Sources for song names.")
+                raise CatalogError("SoundCloud link resolver needs a URL. Use SoundCloud Search or All Sources for song names.")
+            return [tioo.resolve_soundcloud(query)]
+        if provider == "btch-gdrive":
+            parsed=urlparse(query)
+            if parsed.scheme not in {"http","https"} or not parsed.netloc:
+                raise CatalogError("Google Drive BTCH resolver needs a URL.")
             return [btch.resolve(provider, query)]
     except httpx.HTTPError as exc:
         raise CatalogError(f"{provider} connection failed: {exc}") from exc
@@ -511,6 +515,8 @@ def get_track(provider: str, settings: dict, track_id: str) -> dict:
                 "license": f"Stremio addon: {info.get('addon') or ''}".rstrip(),
                 "access": "playable",
             }
+        if provider == "btch-soundcloud":
+            return tioo.resolve_soundcloud(btch.unpack_url(tid))
         if provider in btch.PROVIDERS:
             return btch.resolve(provider, btch.unpack_url(tid))
     except httpx.HTTPError as exc:
@@ -556,6 +562,8 @@ def stream_url(provider: str, settings: dict, track_id: str) -> str:
             return str(rows[0]["audio"])
         if provider == "stremio":
             return _stremio_direct_url(settings, tid)
+        if provider == "btch-soundcloud":
+            return str(tioo.resolve_soundcloud(btch.unpack_url(tid))["media_url"])
         if provider in btch.PROVIDERS:
             return str(btch.resolve(provider, btch.unpack_url(tid))["media_url"])
     except httpx.HTTPError as exc:
@@ -582,6 +590,8 @@ def test(provider: str, settings: dict) -> dict:
         if not _stremio_resource(manifest, "catalog") or not _stremio_resource(manifest, "stream"):
             raise CatalogError("Stremio addon must expose both catalog and stream resources.")
         return {"ok": True, "message": f"Stremio addon '{manifest.get('name') or manifest.get('id')}' loaded with {len(catalogs)} catalog(s).", "manifest_url": manifest_url}
+    if provider == "btch-soundcloud":
+        return tioo.runtime_status()
     if provider in btch.PROVIDERS:
         return btch.runtime_status()
     raise CatalogError("Unsupported catalog provider")
