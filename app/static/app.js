@@ -400,7 +400,7 @@ async function refreshAll() {
 }
 function renderStatus() {
   const s=state.status;if(!s)return;const np=s.now_playing,sh=s.shoutcast||{};
-  $('shoutcastStatus').textContent=sh.engine_running?(sh.output_active===false?'Disconnected':sh.output_active===true?'Connected':'Engine ready'):'Engine stopped';
+  $('shoutcastStatus').textContent=sh.engine_running?(sh.output_active===false?'Disconnected':sh.playout_enabled===false?'Connected · silence':sh.output_active===true?'Connected · playing':'Engine ready'):'Engine stopped';
   $('shoutcastDot').className='dot '+(sh.output_active===true?'good':sh.engine_running?'warn':'bad');
   $('airDot').className='dot '+(np&&s.playout_state==='playing'&&sh.output_active===true?'good':'unknown');
   $('nowTitle').textContent=np?.title||'Nothing on air'; $('nowArtist').textContent=np?.artist||'—';
