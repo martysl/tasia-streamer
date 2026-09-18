@@ -133,17 +133,51 @@ def _clean(raw: str) -> str:
     return '\n'.join(x.strip() for x in raw.replace('\r','').split('\n') if x.strip() and x.strip()!='END').strip()
 
 
+def playout_enabled(user_id: int) -> bool | None:
+    """Read the actual Liquidsoap interactive playout switch."""
+    with _lock:
+        eng=_engines.get(user_id)
+    if not eng or eng.process.poll() is not None:
+        return None
+    try:
+        raw=_clean(command(user_id,'var.get tasia_playout',ensure_engine=False)).strip().lower()
+    except Exception:
+        return None
+    if raw in {'true','1','on','yes'}:
+        return True
+    if raw in {'false','0','off','no'}:
+        return False
+    return None
+
+
+def set_playout(user_id: int, enabled: bool) -> str:
+    """Set Liquidsoap playout and verify the live value when readable."""
+    desired='true' if enabled else 'false'
+    reply=_clean(command(user_id,f'var.set tasia_playout = {desired}'))
+    actual=playout_enabled(user_id)
+    if actual is not None and actual is not bool(enabled):
+        # One retry protects against a reconnect/restart race where the command
+        # lands while the fresh engine is still registering interactive vars.
+        time.sleep(.05)
+        reply=_clean(command(user_id,f'var.set tasia_playout = {desired}',ensure_engine=False))
+        actual=playout_enabled(user_id)
+    if actual is not None and actual is not bool(enabled):
+        raise RuntimeError(f'Liquidsoap refused tasia_playout={desired}')
+    return reply
+
+
 def status(user_id: int) -> dict:
     with _lock: eng=_engines.get(user_id)
     if not eng or eng.process.poll() is not None:
-        return {'engine_running':False,'output_active':False,'raw':'engine stopped','error':db.get_state(user_id,'engine_error')}
+        return {'engine_running':False,'output_active':False,'playout_enabled':None,'raw':'engine stopped','error':db.get_state(user_id,'engine_error')}
+    live_playout=playout_enabled(user_id)
     try:
         raw=_clean(command(user_id,'shoutcast.status',ensure_engine=False)); low=raw.lower(); active=None
         if any(x in low for x in ('stopped','inactive','not started')): active=False
         elif any(x in low for x in ('started','active','running','connected')): active=True
-        return {'engine_running':True,'output_active':active,'raw':raw or 'available','error':None}
+        return {'engine_running':True,'output_active':active,'playout_enabled':live_playout,'raw':raw or 'available','error':None}
     except Exception as exc:
-        return {'engine_running':True,'output_active':None,'raw':str(exc),'error':None}
+        return {'engine_running':True,'output_active':None,'playout_enabled':live_playout,'raw':str(exc),'error':None}
 
 
 def connect_output(user_id: int) -> str:
