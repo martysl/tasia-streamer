@@ -18,6 +18,10 @@ SoundCloud direct links use `https://backend1.tioo.eu.org/api/downloader/soundcl
 
 Google Drive URL resolution still uses BTCH. YouTube was **not** removed: explicit YouTube URLs continue through Tasia's existing Universal/API path. Spotify never silently falls back to YouTube.
 
+### Live LSL / OpenSim DJ mic
+
+Tasia Talk mesh/LSL replies are injected immediately into a dedicated Liquidsoap `request.queue` instead of waiting for the current song to finish. While Tasia speaks, the music is automatically ducked to 30%, her voice is mixed at full level, and the music returns to normal as soon as the live voice queue is empty. Automatic between-song Tasia Talk remains a separate scheduler feature.
+
 ## Suno playback (beta29 maintenance update)
 
 For normal public Suno song URLs and bare clip UUIDs, Tasia can prefer a private downloader configured only in your local `.env`:

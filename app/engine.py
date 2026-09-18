@@ -166,6 +166,27 @@ def set_playout(user_id: int, enabled: bool) -> str:
     return reply
 
 
+def push_live_voice(user_id: int, path: Path) -> str:
+    """Inject a local Tasia voice file into the live Liquidsoap overlay queue."""
+    audio = Path(path).resolve()
+    if not audio.is_file() or audio.stat().st_size <= 0:
+        raise RuntimeError("Tasia live voice file is missing or empty")
+
+    with _lock:
+        eng = _engines.get(user_id)
+    if not eng or eng.process.poll() is not None:
+        raise RuntimeError("Radio engine is not running. Connect the stream before using live LSL speech.")
+
+    # request.queue exposes <id>.push on Liquidsoap's command server. Local
+    # TTS filenames contain no spaces, but a proper file:// URI is unambiguous.
+    uri = audio.as_uri()
+    reply = _clean(command(user_id, f"tasia_live.push {uri}", ensure_engine=False))
+    low = reply.lower()
+    if any(token in low for token in ("error", "failed", "unknown command", "not found")):
+        raise RuntimeError(f"Liquidsoap rejected live Tasia speech: {reply}")
+    return reply
+
+
 def status(user_id: int) -> dict:
     with _lock: eng=_engines.get(user_id)
     if not eng or eng.process.poll() is not None:

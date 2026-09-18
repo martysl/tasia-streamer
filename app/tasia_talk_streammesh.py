@@ -1,48 +1,30 @@
 from __future__ import annotations
 
-from collections import defaultdict, deque
 from pathlib import Path
-import threading
 
-from . import db, tasia_talk
+from . import db, engine, tasia_talk
 
-_lock = threading.RLock()
-_stream_queue: dict[int, deque[dict]] = defaultdict(deque)
 _installed = False
 
 
 def enqueue_stream_voice(user_id: int, path: Path, text: str, duration: float | None) -> None:
+    """Push an LSL/mesh voice line straight into Liquidsoap's live mic queue.
+
+    The Liquidsoap graph mixes this queue over the currently playing music and
+    ducks the music while a live voice request is ready/playing. It never waits
+    for the current song to end.
+    """
+    uid = int(user_id)
+
     # A live SL/OpenSim interaction is more important than an automatically
     # prepared between-song comment. Drop the pending automatic link so Tasia
-    # does not speak twice back-to-back after greeting/responding to somebody.
-    tasia_talk.clear_pending(int(user_id))
+    # does not speak twice back-to-back.
+    tasia_talk.clear_pending(uid)
 
-    track = {
-        "title": "Tasia Live",
-        "artist": "Tasia",
-        "path": str(path),
-        "source_type": "tasia-talk",
-        "source_url": "lsl",
-        "duration": duration,
-        "origin": "talk",
-        "queue_id": None,
-        "library_id": None,
-    }
-    with _lock:
-        _stream_queue[int(user_id)].append(track)
-    db.set_state(int(user_id), tasia_talk.LAST_TEXT_KEY, text)
-    db.set_state(int(user_id), tasia_talk.LAST_ERROR_KEY, "")
+    engine.push_live_voice(uid, path)
 
-
-def _take_stream_voice(user_id: int) -> dict | None:
-    with _lock:
-        q = _stream_queue.get(int(user_id))
-        if not q:
-            return None
-        try:
-            return q.popleft()
-        except IndexError:
-            return None
+    db.set_state(uid, tasia_talk.LAST_TEXT_KEY, text)
+    db.set_state(uid, tasia_talk.LAST_ERROR_KEY, "")
 
 
 def _mesh_worker_to_stream(job_id: str, user_id: int, prompt: str) -> None:
@@ -50,21 +32,26 @@ def _mesh_worker_to_stream(job_id: str, user_id: int, prompt: str) -> None:
         job = tasia_talk._mesh_jobs.get(job_id)
         if job:
             job.status = "working"
+
     path: Path | None = None
     try:
         settings = tasia_talk.get_settings(user_id)
         text = tasia_talk.mesh_line(user_id, prompt, settings)
         path, duration = tasia_talk.synthesize(user_id, text, settings)
+
+        # Push first so "done" really means the live radio accepted the line.
         enqueue_stream_voice(user_id, path, text, duration)
+
+        # Keep the normal status/audio URL useful to LSL and the web UI too.
+        token = tasia_talk.register_audio(user_id, path, ttl=900)
+
         with tasia_talk._lock:
             job = tasia_talk._mesh_jobs.get(job_id)
             if job:
                 job.status = "done"
                 job.text = text
                 job.duration = duration
-                # Marker used by the status API. The audio is not returned to
-                # LSL: it is queued for the radio scheduler instead.
-                job.token = "stream"
+                job.token = token
     except Exception as exc:
         if path:
             path.unlink(missing_ok=True)
@@ -82,22 +69,7 @@ def install() -> None:
         return
     _installed = True
 
-    # External LSL/mesh speech should be the next available scheduler item.
-    # Liquidsoap may already have one ON DECK item prefetched, so we never
-    # interrupt the song currently on air; Tasia speaks at the next available
-    # transition instead.
-    original_next = db.next_track
-
-    def next_track_with_live_tasia(user_id: int):
-        live = _take_stream_voice(user_id)
-        if live:
-            return live
-        return original_next(user_id)
-
-    next_track_with_live_tasia._tasia_live_wrapped = True  # type: ignore[attr-defined]
-    next_track_with_live_tasia._tasia_live_original = original_next  # type: ignore[attr-defined]
-    db.next_track = next_track_with_live_tasia  # type: ignore[assignment]
-
-    # Reuse the existing async job machinery, but route generated audio into
-    # Tasia Streamer's playout scheduler instead of returning it as mesh media.
+    # Reuse the existing async AI/TTS job machinery, but once the MP3 is ready
+    # inject it immediately into Liquidsoap's live voice overlay. Normal
+    # automatic Tasia Talk still uses the between-song scheduler path.
     tasia_talk._mesh_worker = _mesh_worker_to_stream
