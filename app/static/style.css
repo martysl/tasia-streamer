@@ -89,3 +89,15 @@ button:disabled{opacity:.45;cursor:not-allowed;filter:none}.library-search{displ
 .tasia-talk-quick:hover{border-color:var(--line2);filter:brightness(1.08)}
 .tasia-talk-quick input{width:15px;height:15px;margin:0;accent-color:var(--pink);cursor:pointer}
 .tasia-talk-quick input:disabled{cursor:wait;opacity:.55}
+
+
+/* named saved playlists */
+.playlist-manager{display:grid;grid-template-columns:minmax(120px,1fr) repeat(7,auto);gap:5px;align-items:center;margin:0 0 5px}
+.playlist-manager select{min-width:0;width:100%;background:#0b0810;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.playlist-manager-msg{margin:0 0 7px;text-align:right;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1350px) and (min-width:1051px){
+  .playlist-manager{grid-template-columns:minmax(120px,1fr) repeat(3,auto)}
+}
+@media(max-width:1050px){
+  .playlist-manager{grid-template-columns:minmax(150px,1fr) repeat(3,auto)}
+}
